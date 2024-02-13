@@ -63,36 +63,13 @@ def unnormalize_colors(normalized_images, mean, std):
 # 2) normalizing the colors on each color channel (by substracing the mean and dividing by std)
 
 
-def is_going_back(action_before, action_now):
-
-    if action_before is None:
-        return False
-
-    action_before = str(action_before)
-    action_now = str(action_now)
-
-    if "left" in action_before and "right" in action_now:
-        return True
-    
-    elif "right" in action_before and "left" in action_now:
-        return True
-
-    elif "down" in action_before and "up" in action_now:
-        return True
-
-    elif "up" in action_before and "down" in action_now:
-        return True
-
-    return False
-
-
-nb_samplings_per_starting_state = 6001 # has to be ODD 
+nb_samplings_per_starting_state = 3 # has to be ODD 
 
 
 def generate_dataset():
 
     ## 1) Loading the env
-    env = pddlgym.make("PDDLEnvSokoban-v0", dynamic_action_space=True)
+    env = pddlgym.make("PDDLEnvHanoi-v0", dynamic_action_space=True)
     # obs, debug_info = env.reset(_problem_idx=0)
 
     all_traces = []
@@ -104,20 +81,19 @@ def generate_dataset():
 
     # looping over the number of starting positions
     # for blocksworld only the 1st pb has 4 blocks
-    for ii in range(3):
+    for ii in range(1):
 
         all_images_of_a_trace = []
         all_obs_of_a_trace = []
         all_actions_of_a_trace = []
         all_layouts_of_a_trace = []
-        action_before = None
 
         # Initializing the first State
         obs, debug_info = env.reset(_problem_idx=ii)
 
 
         # Retrieve the 1st image
-        img, layout = env.render()
+        img, peg_to_disc_list = env.render()
         img = img[:,:,:3] # remove the transparancy
 
         print(img.shape)
@@ -131,7 +107,7 @@ def generate_dataset():
 
         # adding the img and obs to all_*
         all_images_of_a_trace.append(img)
-        all_layouts_of_a_trace.append(layout)
+        all_layouts_of_a_trace.append(peg_to_disc_list)
         all_obs_of_a_trace.append(obs.literals)
 
 
@@ -143,8 +119,7 @@ def generate_dataset():
             # sample an action
             action = env.action_space.sample(obs)
 
-            while(is_going_back(action_before, action)):
-                action = env.action_space.sample(obs)
+
 
             # Capture the end time
             inter_time = time.time()
@@ -166,7 +141,7 @@ def generate_dataset():
             print(f"The inter time 1 is {duration} seconds.")
 
 
-            img, layout = env.render()
+            img, peg_to_disc_list = env.render()
             img = img[:,:,:3]
 
 
@@ -178,11 +153,11 @@ def generate_dataset():
             print(f"The inter time 2 is {duration} seconds.")
 
 
-            # plt.imsave("sokoban_"+str(jjj)+".png", img)
+            # plt.imsave("hanoi_"+str(jjj)+".png", img)
             # plt.close()
 
             all_images_of_a_trace.append(img)
-            all_layouts_of_a_trace.append(layout)
+            all_layouts_of_a_trace.append(peg_to_disc_list)
             all_obs_of_a_trace.append(obs.literals)
 
 
@@ -192,7 +167,6 @@ def generate_dataset():
             duration = end_time - start_time
             print(f"The code block took {duration} seconds to execute.")
 
-            action_before = action
 
         all_traces.append([all_images_of_a_trace, all_actions_of_a_trace, all_obs_of_a_trace, all_layouts_of_a_trace])
     
@@ -208,7 +182,7 @@ def generate_dataset():
 # and possibly construct special actions 
 # Input: all_images, all_actions, all_layouts
 # Return: pairs of images, corresponding actions (one-hot)
-def modify_one_trace(all_images, all_actions, all_layouts, mean_all, std_all, all_actions_unique_):
+def modify_one_trace(all_images, all_actions, all_layouts, mean_all, std_all):
     
     # 1) preprocess images
     all_images = np.array(all_images)
@@ -238,10 +212,17 @@ def modify_one_trace(all_images, all_actions, all_layouts, mean_all, std_all, al
     # plt.imsave("soko_pair0_1.png", all_pairs_of_images[1][1])
     # plt.close()
 
+
+    #build array containing all actions (no duplicate)
+    all_actions_unique = []
+    for uuu, act in enumerate(all_actions):
+        if str(act) not in all_actions_unique:
+            all_actions_unique.append(str(act))
+
     #build array containing actions indices of the dataset
     all_actions_indices = []
     for ac in all_actions:
-        all_actions_indices.append(all_actions_unique_.index(str(ac)))
+        all_actions_indices.append(all_actions_unique.index(str(ac)))
     
     print("all accc")
     print(len(all_actions))
@@ -251,9 +232,9 @@ def modify_one_trace(all_images, all_actions, all_layouts, mean_all, std_all, al
     actions_indexes = torch.tensor(all_actions_indices)
 
     # array of one hot encoded actions
-    actions_one_hot = F.one_hot(actions_indexes, num_classes=len(all_actions_unique_))
+    actions_one_hot = F.one_hot(actions_indexes, num_classes=len(all_actions_unique))
 
-    return all_pairs_of_images, all_pairs_of_images_orig, actions_one_hot
+    return all_pairs_of_images, all_pairs_of_images_orig, actions_one_hot, all_actions_unique
 
 
 def load_dataset(path_to_file):
@@ -295,13 +276,13 @@ def save_dataset(dire, traces):
 all_traces = generate_dataset()
 
 # 2) save dataset
-save_dataset("sokoban_dataset", all_traces)
+save_dataset("hanoi_dataset", all_traces)
 
 
 def export_dataset():
 
     # 3) load
-    loaded_dataset = load_dataset("/workspace/pddlgym-tests/pddlgym/sokoban_dataset/data.p")
+    loaded_dataset = load_dataset("/workspace/pddlgym-tests/pddlgym/hanoi_dataset/data.p")
 
     # for trace in load_dataset:
     #     all_images = trace[0]
@@ -312,30 +293,19 @@ def export_dataset():
     # modify_one_trace
 
     all_images = []
-    all_actions = []
     all_pairs_of_images = []
     all_pairs_of_images_orig = []
     all_actions_one_hot = []
     all_actions_unique = []
-
-
-
-
 
     # first loop to compute the whole dataset mean and std
     for trace in loaded_dataset["traces"]:
         # all_images[:, ::4, ::4, :]
        
         all_images.extend(np.array(trace[0])[:, ::4, ::4, :])
-        all_actions.extend(trace[1])
 
     _, mean_all, std_all = normalize_colors(all_images, mean=None, std=None)
 
-
-    #build array containing all actions (no duplicate)
-    for uuu, act in enumerate(all_actions):
-        if str(act) not in all_actions_unique:
-            all_actions_unique.append(str(act))
 
     # second loop to construct the pairs
     for trace in loaded_dataset["traces"]:
@@ -346,7 +316,7 @@ def export_dataset():
         all_layouts_tr = trace[3]
         # all_images_of_a_trace, all_actions_of_a_trace, all_obs_of_a_trace, all_layouts_of_a_trace
 
-        all_pairs_of_images_of_trace, all_pairs_of_images_orig_of_trace, actions_one_hot_of_trace = modify_one_trace(all_images_tr, all_actions_tr, all_layouts_tr, mean_all, std_all, all_actions_unique)
+        all_pairs_of_images_of_trace, all_pairs_of_images_orig_of_trace, actions_one_hot_of_trace, all_actions_unique_of_trace = modify_one_trace(all_images_tr, all_actions_tr, all_layouts_tr, mean_all, std_all)
 
         print("ici")
         print(len(all_pairs_of_images_of_trace))
@@ -359,6 +329,9 @@ def export_dataset():
 
 
 
+
+
+    all_actions_unique = all_actions_unique_of_trace
 
     return all_pairs_of_images, all_pairs_of_images_orig, all_actions_one_hot, mean_all, std_all, all_actions_unique
 

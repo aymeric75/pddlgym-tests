@@ -33,7 +33,7 @@ def unnormalize_colors(normalized_images, mean, std):
 
 
 
-nb_samplings_per_starting_state = 3 # has to be ODD 
+nb_samplings_per_starting_state = 501 # has to be ODD 
 
 def export_dataset():
 
@@ -64,7 +64,7 @@ def export_dataset():
 
         # rescaling
         # reducing resolution by 4
-        img = img[::4, ::4]
+        img = img[::8, ::8]
 
         print(img.shape)
         
@@ -90,10 +90,10 @@ def export_dataset():
 
             # rescaling
             # reducing resolution by 4
-            img = img[::4, ::4]
+            img = img[::8, ::8]
 
-            plt.imsave("blocks_"+str(jjj)+".png", img)
-            plt.close()
+            # plt.imsave("blocks_"+str(jjj)+".png", img)
+            # plt.close()
 
             all_images.append(img)
             all_obs.append(obs.literals)
@@ -157,13 +157,12 @@ def export_dataset():
     print(np.array(all_pairs_of_images).shape)
     print(np.array(all_pairs_of_images_norm).shape)
     print(np.array(actions_one_hot).shape)
-    exit()
 
     return all_pairs_of_images, all_pairs_of_images_norm, actions_one_hot.numpy(), mean_, std_, all_actions_unique
 
 
 
-export_dataset()
+#export_dataset()
 
 
 

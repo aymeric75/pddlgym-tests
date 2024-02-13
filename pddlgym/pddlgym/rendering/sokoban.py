@@ -88,9 +88,6 @@ def build_layout(obs):
     # r-c flip
     layout = np.transpose(layout)
 
-    print("layout:")
-    print(layout)
-    
     # import ipdb; ipdb.set_trace()
     return layout
 
@@ -165,9 +162,9 @@ def render(obs, mode='human', close=False):
         layout = build_layout_egocentric(obs)
         return render_from_layout(layout, get_token_images)
     elif mode == "human":
-        print("222")
+
         layout = build_layout(obs)
-        return render_from_layout(layout, get_token_images)
+        return render_from_layout(layout, get_token_images), layout
     elif mode == "egocentric_crisp":
         print("333")
         layout = build_layout_egocentric(obs)

@@ -7,6 +7,33 @@ import matplotlib.pyplot as plt
 def rescale(images):
     return images/255.
 
+
+def to_black_and_white(images):
+    # Initialize an array of zeros with the same shape as the input, but without the color channels
+    bw_images = np.zeros(images.shape[:-1], dtype="uint8")
+
+    # Iterate through each image
+    for i, img in enumerate(images):
+        # Check if all color channels are 255 (white), across all pixels
+        # The result is a 2D boolean array where True represents a white pixel
+        is_white = np.all(img == 255, axis=-1)
+
+        # Set pixels in the black and white image to 255 (white) where is_white is True, else they remain 0 (black)
+        bw_images[i][is_white] = 255
+
+    return bw_images
+
+
+# Convert to grayscale
+def rgb_to_grayscale(rgb_images):
+    print("IN rgb_to_grayscale")
+    rgb_images = np.array(rgb_images)
+    grayscale = np.dot(rgb_images[...,:3], [0.21, 0.72, 0.07]).astype("uint8") 
+    # Stack the grayscale values to create an (H, W, 3) image
+    #return np.stack((grayscale,)*3, axis=-1)
+    return grayscale
+
+
 #def reduce_resolution(images):
 
 
@@ -33,7 +60,7 @@ def unnormalize_colors(normalized_images, mean, std):
 
 
 
-nb_samplings_per_starting_state = 3 # has to be ODD 
+nb_samplings_per_starting_state = 20001 # has to be ODD 
 
 def export_dataset():
 
@@ -64,7 +91,7 @@ def export_dataset():
 
         # rescaling
         # reducing resolution by 4
-        img = img[::4, ::4]
+        img = img[::9, ::9]
 
         print(img.shape)
 
@@ -92,7 +119,7 @@ def export_dataset():
 
             # rescaling
             # reducing resolution by 4
-            img = img[::4, ::4]
+            img = img[::9, ::9]
 
             all_images.append(img)
             all_obs.append(obs.literals)
@@ -100,7 +127,24 @@ def export_dataset():
 
     all_images = np.array(all_images)
     
+    print(all_images[0])
+
     # ##### Preprocess the images
+    
+    ## greys out the images
+    all_images = rgb_to_grayscale(all_images)
+
+    #all_images = to_black_and_white(all_images)
+    print()
+    print(all_images[0].shape)
+
+
+    plt.imsave("hanoi_NOT.png", all_images[0])
+    plt.close()
+
+
+
+    ## normalize color
     all_images_norm, mean_, std_ = normalize_colors(all_images)
     #all_images_norm_denorm = unnormalize_colors(all_images_norm, mean_, std_)
 
@@ -128,13 +172,12 @@ def export_dataset():
     print(len(all_actions_for_each_pair))
     print(all_actions_for_each_pair[2])
     print()
-    plt.imsave("hanoi_pair0_0.png", all_pairs_of_images[2][0])
+    plt.imsave("hanoi_pair0_0.png", all_pairs_of_images[2][0], cmap='gray')
     plt.close()
 
 
-    plt.imsave("hanoi_pair0_1.png", all_pairs_of_images[2][1])
+    plt.imsave("hanoi_pair0_1.png", all_pairs_of_images[2][1], cmap='gray')
     plt.close()
-
 
 
     #build array containing all actions (no duplicate)
@@ -159,13 +202,11 @@ def export_dataset():
     print(np.array(all_pairs_of_images_norm).shape)
     print(np.array(actions_one_hot).shape)
     
-    exit()
-
     return all_pairs_of_images, all_pairs_of_images_norm, actions_one_hot.numpy(), mean_, std_, all_actions_unique
 
 
 
-export_dataset()
+#export_dataset()
 
 
 

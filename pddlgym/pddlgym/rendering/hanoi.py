@@ -123,8 +123,6 @@ def render(obs, mode='human', close=False):
 
     pegs, discs_ordered_by_size, peg_to_disc_list = get_objects_from_obs(obs)
 
-    print("peg_to_disc_list")
-    print(peg_to_disc_list)
 
 
     peg_width, peg_height, peg_to_hor_midpoints = get_peg_params(pegs, width, height)
@@ -135,4 +133,4 @@ def render(obs, mode='human', close=False):
     draw_discs(ax, disc_height, disc_midpoints, disc_widths)
     plt.close()
     #plt.clf()
-    return fig2data(fig)
+    return fig2data(fig), peg_to_disc_list

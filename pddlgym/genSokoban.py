@@ -122,6 +122,12 @@ def generate_dataset():
 
         print(img.shape)
         
+        print("iiicii")
+
+        plt.imsave("sokoban_111111.png", img)
+        plt.close()
+        exit()
+
 
         # rescaling
         # reducing resolution by 4
@@ -295,7 +301,7 @@ def save_dataset(dire, traces):
 all_traces = generate_dataset()
 
 # 2) save dataset
-save_dataset("sokoban_dataset", all_traces)
+#save_dataset("sokoban_dataset", all_traces)
 
 
 def export_dataset():

@@ -90,17 +90,28 @@ def draw_pegs(ax, peg_width, peg_height, peg_to_hor_midpoints, height):
         x = midx - peg_width / 2
         y = 0
         rect = patches.Rectangle((x,y), peg_width, peg_height, 
-            linewidth=1, edgecolor=(0.2,0.2,0.2), facecolor=(0.5,0.5,0.5))
+            linewidth=0, edgecolor=(0.2,0.2,0.2), facecolor=(0.5,0.5,0.5))
         ax.add_patch(rect)
 
 def draw_discs(ax, disc_height, disc_midpoints, disc_widths):
+
+
+    # vert 0 1 0
+    # blue 0 0 1
+    # red 1 0 0
+    # no borders
+    
+    colors = [(0, 1, 0), (0, 0, 1), (1, 0, 0)]
+    counter=0
     for disc, (midx, midy) in disc_midpoints.items():
+
         disc_width = disc_widths[disc]
         x = midx - disc_width / 2
         y = midy - disc_height / 2
         rect = patches.Rectangle((x,y), disc_width, disc_height, 
-            linewidth=1, edgecolor=(0.2,0.2,0.2), facecolor=(0.8,0.1,0.1))
+            linewidth=0, edgecolor=(1,1,1), facecolor=colors[counter])
         ax.add_patch(rect)
+        counter+=1
 
 def render(obs, mode='human', close=False):
 
@@ -122,7 +133,7 @@ def render(obs, mode='human', close=False):
         axis.set_major_locator(plt.NullLocator())
 
     pegs, discs_ordered_by_size, peg_to_disc_list = get_objects_from_obs(obs)
-
+    print(pegs)
 
 
     peg_width, peg_height, peg_to_hor_midpoints = get_peg_params(pegs, width, height)

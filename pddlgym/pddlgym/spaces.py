@@ -16,6 +16,10 @@ import os
 import tempfile
 import itertools
 
+import numpy as np
+
+np.random.seed(seed=1)
+
 TMP_PDDL_DIR = "/dev/shm" if os.path.exists("/dev/shm") else None
 
 
@@ -66,20 +70,26 @@ class LiteralSpace(Space):
         # print()
 
     def sample_literal(self, state):
-        #print("sample_literal1")
+        
         while True:
             num_lits = len(self._all_ground_literals)
+            
             idx = self.np_random.choice(num_lits)
             lit = self._all_ground_literals[idx]
-            
+
+            # print("pppp")
+            # print(state)
+            # print()
+            # print(lit)
             if self._lit_valid_test(state, lit):
                 break
         return lit  
 
     def sample(self, state):
-        #print("sample4")
+
         self._update_objects_from_state(state)
-        #print(state)
+
+
         return self.sample_literal(state)
 
     def all_ground_literals(self, state, valid_only=True):
@@ -177,12 +187,14 @@ class LiteralActionSpace(LiteralSpace):
             self._ground_action_to_neg_preconds[ground_action] = neg_preconds
 
     def sample_literal(self, state):
-        #print("sample_literal0")
+        print("sample_literal0")
         valid_literals = self.all_ground_literals(state)
         valid_literals = list(sorted(valid_literals))
+        print("sample_li0")
         return valid_literals[self.np_random.choice(len(valid_literals))]
 
     def sample(self, state):
+        print("sample_li1")
         return self.sample_literal(state)
 
     def all_ground_literals(self, state, valid_only=True):
@@ -244,5 +256,6 @@ class LiteralActionSpace(LiteralSpace):
 class LiteralSetSpace(LiteralSpace):
 
     def sample(self):
+        print("sample_li2")
         #print("sample2")
         raise NotImplementedError()

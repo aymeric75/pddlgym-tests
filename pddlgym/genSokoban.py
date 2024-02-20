@@ -86,7 +86,24 @@ def is_going_back(action_before, action_now):
     return False
 
 
-nb_samplings_per_starting_state = 6001 # has to be ODD 
+
+def stone_is_stuck(obs):
+
+    for ll in obs.literals:
+
+        if str(ll) == "at(stone-01:thing,pos-2-2:location)":
+            return True
+        elif str(ll) == "at(stone-01:thing,pos-4-2:location)":
+            return True
+        elif str(ll) == "at(stone-01:thing,pos-2-4:location)":
+            return True
+        elif str(ll) == "at(stone-01:thing,pos-4-4:location)":
+            return True
+    return False
+
+nb_samplings_max_after_reset = 10 # has to be ODD 
+
+total_nb_steps = 500
 
 
 def generate_dataset():
@@ -96,7 +113,10 @@ def generate_dataset():
     # obs, debug_info = env.reset(_problem_idx=0)
 
     all_traces = []
+    unique_obs = []
+    obs_occurences = {}
 
+    steps_done = 0
 
     # pour 4 images, 3 actions
     # pour N images, N-1 actions
@@ -104,7 +124,7 @@ def generate_dataset():
 
     # looping over the number of starting positions
     # for blocksworld only the 1st pb has 4 blocks
-    for ii in range(3):
+    while steps_done < total_nb_steps:
 
         all_images_of_a_trace = []
         all_obs_of_a_trace = []
@@ -113,26 +133,21 @@ def generate_dataset():
         action_before = None
 
         # Initializing the first State
-        obs, debug_info = env.reset(_problem_idx=ii)
+        obs, debug_info = env.reset(_problem_idx=0)
 
 
         # Retrieve the 1st image
         img, layout = env.render()
         img = img[:,:,:3] # remove the transparancy
 
-        print(img.shape)
-        
-        print("iiicii")
 
-        plt.imsave("sokoban_111111.png", img)
-        plt.close()
-        exit()
+        if str(layout) not in unique_obs:
+            unique_obs.append(str(layout))
+            obs_occurences[str(layout)] = 1
 
 
-        # rescaling
-        # reducing resolution by 4
-        #img = img[ , ::4]
-
+        # plt.imsave("sokoban_111111.png", img)
+        # plt.close()
 
 
         # adding the img and obs to all_*
@@ -140,9 +155,10 @@ def generate_dataset():
         all_layouts_of_a_trace.append(layout)
         all_obs_of_a_trace.append(obs.literals)
 
+        nb_times_stone_stuck = 0
 
         # looping over the nber of states to sample for each starting position
-        for jjj in range(nb_samplings_per_starting_state):
+        for jjj in range(nb_samplings_max_after_reset):
 
             start_time = time.time()
 
@@ -163,7 +179,14 @@ def generate_dataset():
 
             # apply the action and retrieve img and obs
             obs, reward, done, debug_info = env.step(action)
+            steps_done += 1
 
+
+
+            # if stone stuck
+            if stone_is_stuck(obs):
+                nb_times_stone_stuck += 1
+            
 
             # Capture the end time
             inter_time = time.time()
@@ -184,8 +207,16 @@ def generate_dataset():
             print(f"The inter time 2 is {duration} seconds.")
 
 
-            # plt.imsave("sokoban_"+str(jjj)+".png", img)
+            # plt.imsave("sokoban_"+str(steps_done)+".png", img)
             # plt.close()
+
+
+            if str(layout) not in unique_obs:
+                unique_obs.append(str(layout))
+                obs_occurences[str(layout)] = 1
+            else:
+                obs_occurences[str(layout)] += 1
+
 
             all_images_of_a_trace.append(img)
             all_layouts_of_a_trace.append(layout)
@@ -200,8 +231,15 @@ def generate_dataset():
 
             action_before = action
 
+
+            if nb_times_stone_stuck > 3 or done:
+                break
+
         all_traces.append([all_images_of_a_trace, all_actions_of_a_trace, all_obs_of_a_trace, all_layouts_of_a_trace])
     
+    print(obs_occurences)
+
+    exit()
 
     return all_traces
 
@@ -299,6 +337,9 @@ def save_dataset(dire, traces):
 
 # # 1) generate dataset (only once normally)
 all_traces = generate_dataset()
+
+
+exit()
 
 # 2) save dataset
 #save_dataset("sokoban_dataset", all_traces)

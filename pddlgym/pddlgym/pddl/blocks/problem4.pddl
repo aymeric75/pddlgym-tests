@@ -7,11 +7,11 @@
         robot - robot
     )
     (:init 
+        (clear a)
+        (on a b) 
+        (ontable b)
         (clear c)
-        (on c a) 
-        (ontable a)
-        (clear b)
-        (ontable b) 
+        (ontable c) 
         
         (handempty robot)
 

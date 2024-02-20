@@ -76,6 +76,10 @@ def get_disc_params(discs_ordered_by_size, peg_to_disc_list, peg_to_hor_midpoint
     all_disc_widths = np.linspace(max_disc_width, min_disc_width, num_discs)
     disc_widths = dict(zip(discs_ordered_by_size, all_disc_widths))
 
+    # print("disc_widths")
+    # print(disc_widths) # {d3:default: 0.63, d2:default: 0.42, d1:default: 0.21}
+    # exit()
+
     disc_midpoints = {}
     for peg, discs in peg_to_disc_list.items():
         x = peg_to_hor_midpoints[peg]
@@ -95,23 +99,36 @@ def draw_pegs(ax, peg_width, peg_height, peg_to_hor_midpoints, height):
 
 def draw_discs(ax, disc_height, disc_midpoints, disc_widths):
 
+    # {d3:default: 0.63, d2:default: 0.42, d1:default: 0.21}
 
+
+
+    #print(discs_ordered_by_size) # [d3:default, d2:default, d1:default] d1 the smallest
+    
     # vert 0 1 0
     # blue 0 0 1
     # red 1 0 0
     # no borders
     
-    colors = [(0, 1, 0), (0, 0, 1), (1, 0, 0)]
-    counter=0
+    colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
+
     for disc, (midx, midy) in disc_midpoints.items():
+
+        if str(disc) == 'd1:default':
+            disk_num = 0
+        elif str(disc) == 'd2:default':
+            disk_num = 1
+        else:
+            disk_num = 2
+
 
         disc_width = disc_widths[disc]
         x = midx - disc_width / 2
         y = midy - disc_height / 2
         rect = patches.Rectangle((x,y), disc_width, disc_height, 
-            linewidth=0, edgecolor=(1,1,1), facecolor=colors[counter])
+            linewidth=0, edgecolor=(1,1,1), facecolor=colors[disk_num])
         ax.add_patch(rect)
-        counter+=1
+
 
 def render(obs, mode='human', close=False):
 
@@ -133,7 +150,7 @@ def render(obs, mode='human', close=False):
         axis.set_major_locator(plt.NullLocator())
 
     pegs, discs_ordered_by_size, peg_to_disc_list = get_objects_from_obs(obs)
-    print(pegs)
+
 
 
     peg_width, peg_height, peg_to_hor_midpoints = get_peg_params(pegs, width, height)

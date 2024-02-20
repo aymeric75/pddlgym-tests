@@ -7,13 +7,11 @@
         robot - robot
     )
     (:init 
-        (clear c)
-        (on c a) 
-        (ontable a)
         (clear b)
-        (ontable b) 
-        
-        (handempty robot)
+        (on b c) 
+        (ontable c)
+        (holding a)
+        (handfull robot)
 
         ; action literals
         (pickup a)

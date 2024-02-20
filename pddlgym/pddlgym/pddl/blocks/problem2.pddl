@@ -9,10 +9,8 @@
     (:init 
         (clear c)
         (on c a) 
-        (ontable a)
-        (clear b)
-        (ontable b) 
-        
+        (on a b) 
+        (ontable b)
         (handempty robot)
 
         ; action literals

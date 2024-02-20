@@ -11,6 +11,66 @@ from concurrent.futures import ProcessPoolExecutor
 
 
 
+
+def normalize(image):
+    # into 0-1 range
+    if image.max() == image.min():
+        return image - image.min()
+    else:
+        return (image - image.min())/(image.max() - image.min()), image.max(), image.min()
+
+def equalize(image):
+    from skimage import exposure
+    return exposure.equalize_hist(image)
+
+def enhance(image):
+    return np.clip((image-0.5)*3,-0.5,0.5)+0.5
+
+def preprocess(image):
+    image = np.array(image)
+    image = image / 255.
+    image = image.astype(float)
+    image = equalize(image)
+    image, orig_max, orig_min = normalize(image)
+    image = enhance(image)
+    return image, orig_max, orig_min
+
+
+
+
+def deenhance(enhanced_image):
+    # Reverse the final shift by subtracting 0.5
+    temp_image = enhanced_image - 0.5
+    
+    # Reverse the clipping: Since clipping limits values, we cannot fully recover original values if they were outside the [-0.5, 0.5] range. 
+    # However, for values within the range, we can reverse the scale by dividing by 3.
+    # We assume that the enhanced image has values within the range that the clip function allowed.
+    temp_image = temp_image / 3
+    
+    # Reverse the initial shift by adding 0.5 back
+    original_image = temp_image + 0.5
+    
+    return original_image
+
+def denormalize(normalized_image, original_min, original_max):
+    if original_max == original_min:
+        return normalized_image + original_min
+    else:
+        return (normalized_image * (original_max - original_min)) + original_min
+
+
+def unnormalize_colors(normalized_images, mean, std): 
+    # Reverse the normalization process
+    # unnormalized_images = normalized_images * (std + 1e-6) + mean
+    # return np.round(unnormalized_images).astype(np.uint8)
+    # mean = np.array(self.parameters["mean"])
+    # std  = np.array(self.parameters["std"])
+    return (normalized_images*std)+mean
+
+
+
+
+
 # Function to reduce resolution of a single image using np.take
 def reduce_resolution(image):
     # Use np.take to select every 4th element in the first two dimensions
@@ -59,7 +119,7 @@ def normalize_colors(images, mean=None, std=None):
         print(mean.shape)
         print(std.shape)
 
-    return (images - mean)/(std+1e-6), mean, std
+    return (images - mean)/(std+1e-20), mean, std
 
 
 
@@ -129,8 +189,10 @@ def is_going_back(action_before, action_now, peg_to_disc_list_prec):
     return False
 
 
-nb_samplings_per_starting_state = 2001 # has to be ODD 
+nb_samplings_per_starting_state = 301 # has to be ODD 
 
+# 64
+# 70
 
 def generate_dataset():
 
@@ -139,39 +201,32 @@ def generate_dataset():
     # obs, debug_info = env.reset(_problem_idx=0)
 
     all_traces = []
+    unique_obs = []
 
-
+    obs_occurences = {}
+    
+    counter = 0
 
     # looping over the number of starting positions
     # for blocksworld only the 1st pb has 4 blocks
-    for ii in range(4):
+    for ii in range(8):
 
         all_images_of_a_trace = []
         all_obs_of_a_trace = []
         all_actions_of_a_trace = []
         all_layouts_of_a_trace = []
-        action_before = None
-        peg_to_disc_list_prec = None
-        ii=3
+
+
         # Initializing the first State
         obs, debug_info = env.reset(_problem_idx=ii)
 
-        print(obs)
         # Retrieve the 1st image
         img, peg_to_disc_list = env.render()
         img = img[:,:,:3] # remove the transparancy
 
-        print(img.shape)
-
-        plt.imsave("hanoi_00000000000.png", img)
-        plt.close()
-        exit()
-
-        # rescaling
-        # reducing resolution by 4
-        #img = img[ , ::4]
-
-
+        if str(peg_to_disc_list) not in unique_obs:
+            unique_obs.append(str(peg_to_disc_list))
+            obs_occurences[str(peg_to_disc_list)] = 1
 
         # adding the img and obs to all_*
         all_images_of_a_trace.append(img)
@@ -181,58 +236,49 @@ def generate_dataset():
 
         # looping over the nber of states to sample for each starting position
         for jjj in range(nb_samplings_per_starting_state):
-
-            start_time = time.time()
+            
+            if counter%10 == 0:
+                print("counter: {}".format(str(counter)))
 
             # sample an action
             action = env.action_space.sample(obs)
 
-            while(is_going_back(action_before, action, peg_to_disc_list_prec)):
-                action = env.action_space.sample(obs)
-
-            # Capture the end time
-            inter_time = time.time()
-            # Calculate the duration by subtracting the start time from the end time
-            duration = inter_time - start_time
-            print(f"The inter time 0 is {duration} seconds.")
-
-            # add the actions to all_*
-            all_actions_of_a_trace.append(action)
 
             # apply the action and retrieve img and obs
             obs, reward, done, debug_info = env.step(action)
-
             img, peg_to_disc_list = env.render()
             img = img[:,:,:3]
 
-
-            # Capture the end time
-            inter_time = time.time()
-            # Calculate the duration by subtracting the start time from the end time
-            duration = inter_time - start_time
-            print(f"The inter time 2 is {duration} seconds.")
+            if str(peg_to_disc_list) not in unique_obs:
+                unique_obs.append(str(peg_to_disc_list))
+                obs_occurences[str(peg_to_disc_list)] = 1
+            else:
+                obs_occurences[str(peg_to_disc_list)] += 1
 
             # plt.imsave("hanoi_"+str(jjj)+".png", img)
             # plt.close()
+            # if jjj > 10:
+            #     exit()
+            # 
+            # mmmmh problème... non ?
 
             all_images_of_a_trace.append(img)
-            all_layouts_of_a_trace.append(peg_to_disc_list)
+            all_actions_of_a_trace.append(action)
             all_obs_of_a_trace.append(obs.literals)
+            all_layouts_of_a_trace.append(peg_to_disc_list)
+            
 
-
-            # Capture the end time
-            end_time = time.time()
-            # Calculate the duration by subtracting the start time from the end time
-            duration = end_time - start_time
-            print(f"The code block took {duration} seconds to execute.")
-
-            action_before = action
-            peg_to_disc_list_prec = peg_to_disc_list
+            counter += 1
 
         all_traces.append([all_images_of_a_trace, all_actions_of_a_trace, all_obs_of_a_trace, all_layouts_of_a_trace])
     
 
-    return all_traces
+    # print("len unique_obs")
+    # print(len(unique_obs))
+
+
+
+    return all_traces, obs_occurences
 
 
 
@@ -243,41 +289,23 @@ def generate_dataset():
 # and possibly construct special actions 
 # Input: all_images, all_actions, all_layouts
 # Return: pairs of images, corresponding actions (one-hot)
-def modify_one_trace(all_images, all_actions, all_layouts, mean_all, std_all, all_actions_unique_):
-    
-    # 1) preprocess images
-    ## reduce dimension
-    all_images_orig = np.copy(all_images)
-
-
-    print(mean_all.shape)
-    print(std_all.shape) # std_all
-
-    print(len(all_images))
+def modify_one_trace(all_images_transfo_tr, all_images_orig_tr, all_actions, all_layouts, mean_all, std_all, all_actions_unique_):
     
 
-    reduced_images = [reduce_resolution(img) for img in all_images]
-    all_images = np.array(reduced_images)
 
 
-    ## grey the images (optional) or black&white
-    # all_images = rgb_to_grayscale(all_images)
-    # all_images = to_black_and_white(all_images)
-
-    ## normalize by color
-    
-
-    all_images, mean_, std_ = normalize_colors(all_images, mean_all, std_all)
 
     
+
+
     # building the array of pairs
     all_pairs_of_images = []
     all_pairs_of_images_orig = []
-    for iiii, p in enumerate(all_images):
+    for iiii, p in enumerate(all_images_transfo_tr):
         #if iiii%2 == 0:
-        if iiii < len(all_images)-1:
-            all_pairs_of_images.append([all_images[iiii], all_images[iiii+1]])
-            all_pairs_of_images_orig.append([all_images_orig[iiii], all_images_orig[iiii+1]])
+        if iiii < len(all_images_transfo_tr)-1:
+            all_pairs_of_images.append([all_images_transfo_tr[iiii], all_images_transfo_tr[iiii+1]])
+            all_pairs_of_images_orig.append([all_images_orig_tr[iiii], all_images_orig_tr[iiii+1]])
 
     # plt.imsave("hanoi_pair0_1.png", all_pairs_of_images[1][1])
     # plt.close()
@@ -287,10 +315,7 @@ def modify_one_trace(all_images, all_actions, all_layouts, mean_all, std_all, al
     for ac in all_actions:
         all_actions_indices.append(all_actions_unique_.index(str(ac)))
     
-    print("all accc")
-    print(len(all_actions))
-    print(len(all_actions_unique_))
-
+ 
     import torch
     import torch.nn.functional as F
     actions_indexes = torch.tensor(all_actions_indices)
@@ -336,11 +361,44 @@ def save_dataset(dire, traces):
         pickle.dump(data, f)
 
 
-# # 1) generate dataset (only once normally)
-all_traces = generate_dataset()
+# # # 1) generate dataset (only once normally)
+# all_traces, obs_occurences = generate_dataset()
+
+
+# print("len obs_occurences")
+# print(len(obs_occurences))
+
+# [all_images_of_a_trace, all_actions_of_a_trace, all_obs_of_a_trace, all_layouts_of_a_trace]
+
+
+### Nettoyage du dataset
+### 
+
+## for each tr, accumulate the already seen obs
+
+# for tr in all_traces:
+
+#     print("icietla")
+#     print(len(tr[0]))
+#     print(len(tr[-1]))
+#     print(tr[-1])
+#     exit()
+
+#     # parcours des layouts
+#     # for lay in tr[-1]:
+        
+#     #     for l in lay:
+#     #         print(l)
+#     #     print(len(lay))
+
+#     #     exit()
+
+
 
 # # 2) save dataset
 # save_dataset("hanoi_dataset", all_traces)
+
+# exit()
 
 
 # where we load the dataset, and adapt it to our needs
@@ -349,14 +407,6 @@ def export_dataset():
     # 3) load
     loaded_dataset = load_dataset("/workspace/pddlgym-tests/pddlgym/hanoi_dataset/data.p")
 
-    # for trace in load_dataset:
-    #     all_images = trace[0]
-    #     # all_images_of_a_trace, all_actions_of_a_trace, all_obs_of_a_trace, all_layouts_of_a_trace
-
-    # 4) modify the dataset
-
-    # modify_one_trace
-
     all_images = []
     all_actions = []
     all_pairs_of_images = []
@@ -364,78 +414,78 @@ def export_dataset():
     all_actions_one_hot = []
     all_actions_unique = []
 
-
-
-    ## black&white
-    #loaded_dataset["traces"][0] = to_black_and_white(np.array(loaded_dataset["traces"][0]))
-    for jjj, trace in enumerate(loaded_dataset["traces"]):
-        loaded_dataset["traces"][jjj][0] = to_black_and_white(np.array(trace[0]))
+    traces_indices = []
 
     # first loop to compute the whole dataset mean and std
     for iii, trace in enumerate(loaded_dataset["traces"]):
-        # all_images[:, ::4, ::4, :]
 
-        start_time = time.time()
-
-        print(type(trace))
-        print(len(trace))
-        print()
-
-        # all_images_of_a_trace, all_actions_of_a_trace, all_obs_of_a_trace, all_layouts_of_a_trace
         
-        print("iii {}".format(str(iii)))
 
-
-        print(type(trace[0]))
-        print(len(trace[0]))
-
-        print()
-        print(trace[0][0].shape)
-
-        # reduced_resolution = np.take(np.take(np.take(trace[0], np.arange(0, trace[0].shape[1], 4), axis=1),
-        #                                     np.arange(0, trace[0].shape[2], 4), axis=2),
-        #                             np.arange(0, trace[0].shape[3], 1), axis=3)
+        traces_indices.append([iii*len(trace[0]), (iii+1)*len(trace[0])])
 
         reduced_images = [reduce_resolution(img) for img in trace[0]]
         all_images.extend(reduced_images)
-        #all_images.extend(np.array(trace[0])[:, ::4, ::4, :])
-
-
-        inter_time = time.time()
-        duration = inter_time - start_time
-        print(f"The inter time 0 is {duration} seconds.")
-
+      
         #all_actions.extend(trace[1]) # simplest version
 
-
+        # at the same time, construct the augmented actions total array (to construct the "unique" array below)
         # concatenate both the simple action array and the layout desc of the pre state array
         paired_gen = (str(a) + str(b) for a, b in zip(trace[1], trace[-1][:-1]))
         all_actions.extend(list(paired_gen))
 
 
-        inter_time = time.time()
-        duration = inter_time - start_time
-        print(f"The inter time 1 is {duration} seconds.")
+    all_images_preproc, orig_max, orig_min = preprocess(all_images)
 
-    _, mean_all, std_all = normalize_colors(all_images, mean=None, std=None)
 
+    # filtered_values = all_images_preproc[(all_images_preproc != 1.0) & (all_images_preproc != 0.0)]
+    # print(filtered_values)
+
+    # values will be centered on 0
+    all_images_color_norm, mean_all, std_all = normalize_colors(all_images_preproc, mean=None, std=None)
+
+
+    # def preprocess(image):
+    #     image = np.array(image)
+    #     image = image.astype(float)
+    #     image = equalize(image)
+    #     image, orig_max, orig_min = normalize(image)
+    #     image = enhance(image)
+    # de = unnormalize_colors(all_images_color_norm, mean_all, std_all)
+    # de = deenhance(de)
+    # de = denormalize(de, orig_max, orig_min)
+
+    # plt.imsave("hanoi_deNorm.png", de[0])
+    # plt.close()
+
+    # filtered_values = all_images_color_norm[(all_images_color_norm != 1.0) & (all_images_color_norm != 0.0)]
+    # print(filtered_values)
+
+    # orig_max, orig_min
+
+    # exit()
 
     #build array containing all actions WITHOUT DUPLICATE
     for uuu, act in enumerate(all_actions):
         if str(act) not in all_actions_unique:
             all_actions_unique.append(str(act))
 
-    print(len(all_actions_unique)) # 1048
-
 
     # second loop to construct the pairs
-    for trace in loaded_dataset["traces"]:
+    for iiii, trace in enumerate(loaded_dataset["traces"]):
+
+
+        # all_images_transfo_tr
+        # all_images_orig_tr 
+
+        all_images_transfo_tr = all_images_color_norm[traces_indices[iiii][0]:traces_indices[iiii][1]]
+        all_images_orig_tr = all_images[traces_indices[iiii][0]:traces_indices[iiii][1]]
+
+
 
         all_images_tr = trace[0]
         all_actions_tr = trace[1]
         all_obs_tr = trace[2] 
         all_layouts_tr = trace[3]
-
 
 
         # concatenate both the simple action array and the layout desc of the pre state array
@@ -444,13 +494,9 @@ def export_dataset():
 
 
         # all_images_of_a_trace, all_actions_of_a_trace, all_obs_of_a_trace, all_layouts_of_a_trace
-        all_pairs_of_images_of_trace, all_pairs_of_images_orig_of_trace, actions_one_hot_of_trace = modify_one_trace(all_images_tr, all_actions_transfo, all_layouts_tr, mean_all, std_all, all_actions_unique)
+        all_pairs_of_images_of_trace, all_pairs_of_images_orig_of_trace, actions_one_hot_of_trace = modify_one_trace(all_images_transfo_tr, all_images_orig_tr, all_actions_transfo, all_layouts_tr, mean_all, std_all, all_actions_unique)
 
-        print("ici")
-        print(len(all_pairs_of_images_of_trace))
-        print(len(actions_one_hot_of_trace))
-
-        print("la")
+        
         all_pairs_of_images.extend(all_pairs_of_images_of_trace)
         all_pairs_of_images_orig.extend(all_pairs_of_images_orig_of_trace)
         all_actions_one_hot.extend(actions_one_hot_of_trace)
@@ -462,4 +508,23 @@ def export_dataset():
 
 
 
-#export_dataset()
+# all_pairs_of_images, all_pairs_of_images_orig, all_actions_one_hot, mean_all, std_all, all_actions_unique = export_dataset()
+
+# exit()
+
+
+# for hh in range(0, 20, 5):
+
+#     acc = all_actions_unique[np.argmax(all_actions_one_hot[hh])]
+#     print("action for {} is {}".format(str(hh), str(acc)))
+
+#     im1_orig=all_pairs_of_images_orig[hh][0]
+#     im2_orig=all_pairs_of_images_orig[hh][1]
+
+#     plt.imsave("hanoi_pair_"+str(hh)+"_pre.png", im1_orig)
+#     plt.close()
+
+#     plt.imsave("hanoi_pair_"+str(hh)+"_suc.png", im2_orig)
+#     plt.close()
+
+#     #

@@ -3,7 +3,7 @@ from .utils import fig2data
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.patches as patches
-
+import random
 
 def get_objects_from_obs(obs):
     on_links = {}
@@ -57,15 +57,27 @@ def get_block_params(piles, width, height, table_height, robot_height):
 
 def draw_table(ax, width, table_height):
     rect = patches.Rectangle((0,0), width, table_height, 
-        linewidth=1, edgecolor=(0.2,0.2,0.2), facecolor=(0.5,0.2,0.0))
+        linewidth=0, edgecolor=(0.2,0.2,0.2), facecolor=(0.5,0.2,0.0))
     ax.add_patch(rect)
 
 def draw_robot(ax, robot_width, robot_height, midx, midy, holding, block_width, block_height):
     x = midx - robot_width/2
     y = midy - robot_height/2
+    # rect = patches.Rectangle((x,y), robot_width, robot_height, 
+    #     linewidth=1, edgecolor=(0.2,0.2,0.2), facecolor=(0.4, 0.4, 0.4))
     rect = patches.Rectangle((x,y), robot_width, robot_height, 
-        linewidth=1, edgecolor=(0.2,0.2,0.2), facecolor=(0.4, 0.4, 0.4))
+        linewidth=0, edgecolor=(0.2,0.2,0.2), facecolor=(0,0,0))
     ax.add_patch(rect)
+
+
+    label=""
+    if str(holding) == 'a:block':
+        label="A"
+    elif str(holding) == 'b:block':
+        label="B"
+    elif str(holding) == 'c:block':
+        label="C"
+
 
     # Holding
     if holding is None:
@@ -75,9 +87,18 @@ def draw_robot(ax, robot_width, robot_height, midx, midy, holding, block_width, 
         holding_color = block_name_to_color(holding)
         ec = (0.2,0.2,0.2)
     holding_x = midx - block_width/2
-    holding_y = y - block_height/3
-    rect = patches.Rectangle((holding_x,holding_y), block_width, block_height, 
-        linewidth=1, edgecolor=ec, facecolor=holding_color)
+    #holding_y = y - block_height/3
+    holding_y = y - block_height/2
+
+    # rect = patches.Rectangle((holding_x,holding_y), block_width, block_height, 
+    #     linewidth=0, edgecolor=ec, facecolor=holding_color)
+    if holding is not None:
+        rect = patches.Rectangle((holding_x,holding_y), block_width, block_height, 
+            linewidth=0, edgecolor=ec, facecolor=(0,0,0))
+
+    if holding is not None:
+        ax.annotate(label, xy=(holding_x+block_width/2, holding_y+block_height/2), weight='bold', color=(1,1,1), fontsize=40, verticalalignment="center", horizontalalignment="center")
+
     ax.add_patch(rect)
 
 _block_name_to_color = {}
@@ -103,13 +124,28 @@ def block_name_to_color(block_name):
     return _block_name_to_color[block_name]
 
 def draw_blocks(ax, block_width, block_height, block_positions):
-    for block_name, (x, y) in block_positions.items():
-        color = block_name_to_color(block_name)
-        rect = patches.Rectangle((x,y), block_width, block_height, 
-            linewidth=1, edgecolor=(0.2,0.2,0.2), facecolor=color)
-        ax.add_patch(rect)
 
-def render(obs, mode='human', close=False):
+    for block_name, (x, y) in block_positions.items():
+
+        label=""
+        if str(block_name) == 'a:block':
+            label="A"
+        elif str(block_name) == 'b:block':
+            label="B"
+        elif str(block_name) == 'c:block':
+            label="C"
+        else:
+            label="ok"
+
+        color = block_name_to_color(block_name)
+        # rect = patches.Rectangle((x,y), block_width, block_height, 
+        #     linewidth=1, edgecolor=(0.2,0.2,0.2), facecolor=color)
+        rect = patches.Rectangle((x,y), block_width, block_height, 
+            linewidth=0, edgecolor=(0.2,0.2,0.2), facecolor=(0,0,0))
+        ax.add_patch(rect)
+        ax.annotate(label, xy=(x+block_width/2, y+block_height/2), color=(1,1,1), weight='bold', fontsize=40, verticalalignment="center", horizontalalignment="center")
+
+def render(obs, mode='human', close=False, action_was=None):
 
     width, height = 3.2, 3.2
     fig = plt.figure(figsize=(width, height))
@@ -121,11 +157,48 @@ def render(obs, mode='human', close=False):
         axis.set_major_formatter(plt.NullFormatter())
         axis.set_major_locator(plt.NullLocator())
 
-    table_height = height * 0.15
+    #table_height = height * 0.15
+    table_height = height * 0.
     robot_height = height * 0.1
+    #robot_height = height * 0.
 
     piles, holding = get_objects_from_obs(obs)
+    
+    
+    # if we know the action that led to the current obs
+    if action_was is not None:
+        # if this action was putdown
+        if "putdown" in str(action_was):
 
+            # retrieve the name of the block that was put down
+            blockname = str(action_was).split(":")[0][-1] 
+
+            indices_to_take_from = []
+            index_where_putted_block_is=None
+            putted_ele=None
+            # 1) retrieve the index of where the block is and retrieve the indices of free spots
+            for ind, what in enumerate(piles):
+                if type(what) is list:
+                    #if a free spots, we add the index
+                    if len(what) == 0:
+                        indices_to_take_from.append(ind)
+                    elif len(what) == 1:
+                        # if we are at where the putted block is, we retrieve the index
+                        if what[0].name == blockname:
+                            indices_to_take_from.append(ind)
+                            index_where_putted_block_is=ind
+                            putted_ele=what[0]
+
+
+            # 2) take one of the indices randomly and affect the block to it
+            theindex = random.choice(indices_to_take_from)
+            if index_where_putted_block_is != theindex:
+                piles[theindex] = [putted_ele]
+                piles[index_where_putted_block_is] = []
+
+            # print("THE PILE AFTER")
+            # print(piles) # 
+          
 
     block_width, block_height, block_positions = get_block_params(piles, width, height, 
         table_height, robot_height)
@@ -141,4 +214,10 @@ def render(obs, mode='human', close=False):
 
     plt.close()
 
-    return fig2data(fig)
+
+    # print(piles) # [[a:block], [b:block], [c:block]]
+    # print(holding) # 
+
+
+
+    return fig2data(fig), (piles, holding)

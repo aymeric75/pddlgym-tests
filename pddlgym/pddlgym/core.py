@@ -30,6 +30,8 @@ import gym
 
 import numpy as np
 
+from random import seed
+seed(1)
 
 
 class InvalidAction(Exception):
@@ -314,6 +316,7 @@ class PDDLEnv(gym.Env):
         self._raise_error_on_invalid_action = raise_error_on_invalid_action
         self.operators_as_actions = operators_as_actions
 
+
         # Set by self.fix_problem_index
         self._problem_index_fixed = False
 
@@ -492,6 +495,8 @@ class PDDLEnv(gym.Env):
         """
         state, reward, done, debug_info = self.sample_transition(action)
         self.set_state(state)
+
+
         return state, reward, done, debug_info
 
     def _get_new_state_info(self, state):
@@ -508,6 +513,12 @@ class PDDLEnv(gym.Env):
         state = self._get_successor_state(self._state, action, self.domain,
                                           inference_mode=self._inference_mode,
                                           raise_error_on_invalid_action=self._raise_error_on_invalid_action)
+        
+        # if "putdown" in str(action):
+        #     print(action)
+        #     print(state)
+        #     exit()
+        
         return self._get_new_state_info(state)
 
     def _get_successor_state(self, *args, **kwargs):

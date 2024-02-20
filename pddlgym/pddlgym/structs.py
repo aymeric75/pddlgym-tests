@@ -2,7 +2,7 @@
 from collections import namedtuple
 import itertools
 import numpy as np
-
+np.random.seed(1)
 
 ### PDDL Types, Objects, Variables ###
 class Type(str):
@@ -465,6 +465,7 @@ class ProbabilisticEffect:
         raise NotImplementedError("Can't PDDL-ify a probabilistic effect")
 
     def sample(self):
+        print("sample_li3")
         #print("sample1")
         return np.random.choice(self.literals, p=self.probabilities)
 

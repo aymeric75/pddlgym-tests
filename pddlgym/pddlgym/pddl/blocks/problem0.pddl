@@ -7,12 +7,12 @@
         robot - robot
     )
     (:init 
-        (clear c)
-        (on c a) 
+        (clear c) 
+        (clear a) 
+        (clear b) 
+        (ontable c) 
         (ontable a)
-        (clear b)
         (ontable b) 
-        
         (handempty robot)
 
         ; action literals

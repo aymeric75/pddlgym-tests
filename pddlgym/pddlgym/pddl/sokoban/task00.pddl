@@ -1,7 +1,7 @@
 
 (define (problem p024-microban-sequential) (:domain sokoban)
   (:objects
-        dir-down - direction
+    dir-down - direction
 	dir-left - direction
 	dir-right - direction
 	dir-up - direction

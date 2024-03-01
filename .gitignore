@@ -4,6 +4,7 @@ __pycache__
 *.egg-info
 *.pkl
 *.p
+data.p
 *~
 *.python-version
 build

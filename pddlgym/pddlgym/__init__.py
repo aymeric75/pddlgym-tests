@@ -40,6 +40,7 @@ def register_pddl_env(name, is_test_env, other_args):
                      **other_args}),
     )
 
+
 for env_name, kwargs in [
         ("gripper", {'operators_as_actions' : True,
                      'dynamic_action_space' : True}),
@@ -64,6 +65,8 @@ for env_name, kwargs in [
         ("travel", {}),
         ("doors", {'render' : doors_render}),
         ("casino", {}),
+        ("hanoi39", {'render' : hanoi_render39}),
+        ("hanoi44", {'render' : hanoi_render44}),
         ("hanoi", {'render' : hanoi_render}),
         ("hanoi_operator_actions", {'render' : hanoi_render,
                                     'operators_as_actions' : True,

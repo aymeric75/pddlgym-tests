@@ -69,6 +69,18 @@ def unnormalize_colors(normalized_images, mean, std):
 
 
 
+def normalize_colors(images, mean=None, std=None):    
+    if mean is None or std is None:
+        mean      = np.mean(images, axis=0)
+        std       = np.std(images, axis=0)
+        print("was heree")
+        print(len(images))
+        print(mean.shape)
+        print(std.shape)
+
+    return (images - mean)/(std+1e-20), mean, std
+
+
 
 
 # Function to reduce resolution of a single image using np.take
@@ -108,18 +120,6 @@ def rgb_to_grayscale(rgb_images):
     #return np.stack((grayscale,)*3, axis=-1)
     return grayscale
 
-
-
-def normalize_colors(images, mean=None, std=None):    
-    if mean is None or std is None:
-        mean      = np.mean(images, axis=0)
-        std       = np.std(images, axis=0)
-        print("was heree")
-        print(len(images))
-        print(mean.shape)
-        print(std.shape)
-
-    return (images - mean)/(std+1e-20), mean, std
 
 
 
@@ -200,8 +200,11 @@ def generate_dataset():
     env = pddlgym.make("PDDLEnvHanoi-v0", dynamic_action_space=True)
     # obs, debug_info = env.reset(_problem_idx=0)
 
+
+
     all_traces = []
     unique_obs = []
+    unique_obs_img = []
 
     obs_occurences = {}
     
@@ -227,6 +230,7 @@ def generate_dataset():
         if str(peg_to_disc_list) not in unique_obs:
             unique_obs.append(str(peg_to_disc_list))
             obs_occurences[str(peg_to_disc_list)] = 1
+            unique_obs_img.append(img)
 
         # adding the img and obs to all_*
         all_images_of_a_trace.append(img)
@@ -252,6 +256,7 @@ def generate_dataset():
             if str(peg_to_disc_list) not in unique_obs:
                 unique_obs.append(str(peg_to_disc_list))
                 obs_occurences[str(peg_to_disc_list)] = 1
+                unique_obs_img.append(img)
             else:
                 obs_occurences[str(peg_to_disc_list)] += 1
 
@@ -278,7 +283,7 @@ def generate_dataset():
 
 
 
-    return all_traces, obs_occurences
+    return all_traces, obs_occurences, unique_obs_img
 
 
 
@@ -361,8 +366,21 @@ def save_dataset(dire, traces):
         pickle.dump(data, f)
 
 
-# # # 1) generate dataset (only once normally)
-# all_traces, obs_occurences = generate_dataset()
+# # # # 1) generate dataset (only once normally)
+# all_traces, obs_occurences, unique_obs_img = generate_dataset()
+
+# print(obs_occurences)
+
+# print(len(obs_occurences))
+
+# for ij, imm in enumerate(unique_obs_img):
+
+#     imm = reduce_resolution(imm)
+#     plt.imsave("hanoi_unique"+str(ij)+".png", imm)
+#     plt.close()
+
+
+# exit()
 
 
 # print("len obs_occurences")
@@ -433,6 +451,7 @@ def export_dataset():
         paired_gen = (str(a) + str(b) for a, b in zip(trace[1], trace[-1][:-1]))
         all_actions.extend(list(paired_gen))
 
+        #all_actions.extend(trace[1])
 
     all_images_preproc, orig_max, orig_min = preprocess(all_images)
 
@@ -470,6 +489,7 @@ def export_dataset():
             all_actions_unique.append(str(act))
 
 
+
     # second loop to construct the pairs
     for iiii, trace in enumerate(loaded_dataset["traces"]):
 
@@ -491,7 +511,9 @@ def export_dataset():
         # concatenate both the simple action array and the layout desc of the pre state array
         paired_gen = (str(a) + str(b) for a, b in zip(all_actions_tr, all_layouts_tr[:-1]))
         all_actions_transfo = list(paired_gen)
-
+        
+        
+        #all_actions_transfo = all_actions_tr
 
         # all_images_of_a_trace, all_actions_of_a_trace, all_obs_of_a_trace, all_layouts_of_a_trace
         all_pairs_of_images_of_trace, all_pairs_of_images_orig_of_trace, actions_one_hot_of_trace = modify_one_trace(all_images_transfo_tr, all_images_orig_tr, all_actions_transfo, all_layouts_tr, mean_all, std_all, all_actions_unique)
@@ -504,27 +526,31 @@ def export_dataset():
 
 
 
-    return all_pairs_of_images, all_pairs_of_images_orig, all_actions_one_hot, mean_all, std_all, all_actions_unique
+    return all_pairs_of_images, all_pairs_of_images_orig, all_actions_one_hot, mean_all, std_all, all_actions_unique, orig_max, orig_min
 
 
 
-# all_pairs_of_images, all_pairs_of_images_orig, all_actions_one_hot, mean_all, std_all, all_actions_unique = export_dataset()
+all_pairs_of_images, all_pairs_of_images_orig, all_actions_one_hot, mean_all, std_all, all_actions_unique, orig_max, orig_min = export_dataset()
 
 # exit()
 
+# # 352
+# print(len(all_actions_unique))
 
-# for hh in range(0, 20, 5):
+# exit()
 
-#     acc = all_actions_unique[np.argmax(all_actions_one_hot[hh])]
-#     print("action for {} is {}".format(str(hh), str(acc)))
+for hh in range(0, 20, 5):
 
-#     im1_orig=all_pairs_of_images_orig[hh][0]
-#     im2_orig=all_pairs_of_images_orig[hh][1]
+    acc = all_actions_unique[np.argmax(all_actions_one_hot[hh])]
+    print("action for {} is {}".format(str(hh), str(acc)))
 
-#     plt.imsave("hanoi_pair_"+str(hh)+"_pre.png", im1_orig)
-#     plt.close()
+    im1_orig=all_pairs_of_images_orig[hh][0]
+    im2_orig=all_pairs_of_images_orig[hh][1]
 
-#     plt.imsave("hanoi_pair_"+str(hh)+"_suc.png", im2_orig)
-#     plt.close()
+    plt.imsave("hanoi_pair_"+str(hh)+"_pre.png", im1_orig)
+    plt.close()
 
-#     #
+    plt.imsave("hanoi_pair_"+str(hh)+"_suc.png", im2_orig)
+    plt.close()
+
+    #

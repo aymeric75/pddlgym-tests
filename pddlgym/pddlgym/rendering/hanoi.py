@@ -71,6 +71,7 @@ def get_disc_params(discs_ordered_by_size, peg_to_disc_list, peg_to_hor_midpoint
     disc_height = (peg_height * 0.75) / num_discs
 
     horizontal_padding = width * 0.1
+    horizontal_padding = 0.
     max_disc_width = width / num_pegs - horizontal_padding
     min_disc_width = max_disc_width / 3
     all_disc_widths = np.linspace(max_disc_width, min_disc_width, num_discs)
@@ -97,7 +98,7 @@ def draw_pegs(ax, peg_width, peg_height, peg_to_hor_midpoints, height):
             linewidth=0, edgecolor=(0.2,0.2,0.2), facecolor=(0.5,0.5,0.5))
         ax.add_patch(rect)
 
-def draw_discs(ax, disc_height, disc_midpoints, disc_widths):
+def draw_discs(ax, disc_height, disc_midpoints, disc_widths, typeHanoi="39"):
 
     # {d3:default: 0.63, d2:default: 0.42, d1:default: 0.21}
 
@@ -110,7 +111,10 @@ def draw_discs(ax, disc_height, disc_midpoints, disc_widths):
     # red 1 0 0
     # no borders
     
-    colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
+    if typeHanoi == "39":
+        colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
+    elif typeHanoi == "44":
+        colors = [(1, 1, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)]
 
     for disc, (midx, midy) in disc_midpoints.items():
 
@@ -118,8 +122,10 @@ def draw_discs(ax, disc_height, disc_midpoints, disc_widths):
             disk_num = 0
         elif str(disc) == 'd2:default':
             disk_num = 1
-        else:
+        elif str(disc) == 'd3:default':
             disk_num = 2
+        else:
+            disk_num = 3
 
 
         disc_width = disc_widths[disc]
@@ -130,9 +136,48 @@ def draw_discs(ax, disc_height, disc_midpoints, disc_widths):
         ax.add_patch(rect)
 
 
+
+
+def draw_discs_origin(ax, disc_height, disc_midpoints, disc_widths):
+    for disc, (midx, midy) in disc_midpoints.items():
+        disc_width = disc_widths[disc]
+        x = midx - disc_width / 2
+        y = midy - disc_height / 2
+        rect = patches.Rectangle((x,y), disc_width, disc_height, 
+            linewidth=1, edgecolor=(0.2,0.2,0.2), facecolor=(0.8,0.1,0.1))
+        ax.add_patch(rect)
+
+
+
 def render(obs, mode='human', close=False):
 
     width, height = 4.2, 1.5
+    fig = plt.figure(figsize=(width, height))
+    ax = fig.add_axes((0.0, 0.0, 1.0, 1.0),
+                                aspect='equal', frameon=False,
+                                xlim=(-0.05, width + 0.05),
+                                ylim=(-0.05, height + 0.05))
+    for axis in (ax.xaxis, ax.yaxis):
+        axis.set_major_formatter(plt.NullFormatter())
+        axis.set_major_locator(plt.NullLocator())
+
+    pegs, discs_ordered_by_size, peg_to_disc_list = get_objects_from_obs(obs)
+    peg_width, peg_height, peg_to_hor_midpoints = get_peg_params(pegs, width, height)
+    disc_height, disc_midpoints, disc_widths = get_disc_params(discs_ordered_by_size, 
+        peg_to_disc_list, peg_to_hor_midpoints, width, peg_height)
+
+    draw_pegs(ax, peg_width, peg_height, peg_to_hor_midpoints, height)
+    draw_discs_origin(ax, disc_height, disc_midpoints, disc_widths)
+
+    return fig2data(fig), peg_to_disc_list
+
+
+
+
+def render39(obs, mode='human', close=False):
+
+    #width, height = 4.2, 1.5
+    width, height = 7.2, 1.5
     #width, height = 0.8, 0.375 #1.05, 0.375
     #width, height = 0.4, 0.187
 
@@ -158,7 +203,43 @@ def render(obs, mode='human', close=False):
         peg_to_disc_list, peg_to_hor_midpoints, width, peg_height)
 
     draw_pegs(ax, peg_width, peg_height, peg_to_hor_midpoints, height)
-    draw_discs(ax, disc_height, disc_midpoints, disc_widths)
+    draw_discs(ax, disc_height, disc_midpoints, disc_widths, "39")
+    plt.close()
+    #plt.clf()
+    return fig2data(fig), peg_to_disc_list
+
+
+
+
+def render44(obs, mode='human', close=False):
+
+    width, height = 4.2, 1.5
+    #width, height = 7.2, 1.5
+    #width, height = 0.8, 0.375 #1.05, 0.375
+    #width, height = 0.4, 0.187
+
+    fig = plt.figure(figsize=(width, height))
+    # ax = fig.add_axes((0.0, 0.0, 1.0, 1.0),
+    #                             aspect='equal', frameon=False,
+    #                             xlim=(-0.05, width + 0.05),
+    #                             ylim=(-0.05, height + 0.05))
+    ax = fig.add_axes((0.0, 0.0, 1.0, 1.0),
+                                aspect='equal', frameon=False,
+                                xlim=(-0.05, width + 0.05),
+                                ylim=(-0.05, height ))
+    for axis in (ax.xaxis, ax.yaxis):
+        axis.set_major_formatter(plt.NullFormatter())
+        axis.set_major_locator(plt.NullLocator())
+
+    pegs, discs_ordered_by_size, peg_to_disc_list = get_objects_from_obs(obs)
+
+
+    peg_width, peg_height, peg_to_hor_midpoints = get_peg_params(pegs, width, height)
+    disc_height, disc_midpoints, disc_widths = get_disc_params(discs_ordered_by_size, 
+        peg_to_disc_list, peg_to_hor_midpoints, width, peg_height)
+
+    draw_pegs(ax, peg_width, peg_height, peg_to_hor_midpoints, height)
+    draw_discs(ax, disc_height, disc_midpoints, disc_widths, "44")
     plt.close()
     #plt.clf()
     return fig2data(fig), peg_to_disc_list

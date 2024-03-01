@@ -82,7 +82,6 @@ def get_successor_state(state, action, domain, raise_error_on_invalid_action=Fal
     # No operator was found
     elif raise_error_on_invalid_action:
         raise InvalidAction(f"called get_successor_state with invalid action '{action}' for given state")
-
     return state
 
 
@@ -310,7 +309,7 @@ class PDDLEnv(gym.Env):
                  dynamic_action_space=False):
         self._state = None
         self._domain_file = domain_file
-        self._problem_dir = problem_dir
+        self.problem_dir = problem_dir
         self._render = render
         self.seed(seed)
         self._raise_error_on_invalid_action = raise_error_on_invalid_action

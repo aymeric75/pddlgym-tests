@@ -2,6 +2,8 @@ from .minecraft import render as minecraft_render
 from .rearrangement import render as rearrangement_render
 from .sokoban import render as sokoban_render
 from .hanoi import render as hanoi_render
+from .hanoi import render39 as hanoi_render39
+from .hanoi import render44 as hanoi_render44
 from .blocks import render as blocks_render
 from .explodingblocks import render as exploding_blocks_render
 from .doors import render as doors_render

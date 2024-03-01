@@ -75,6 +75,40 @@ def rgb_to_grayscale(rgb_images):
 
 
 
+def deenhance(enhanced_image):
+    # Reverse the final shift by subtracting 0.5
+    temp_image = enhanced_image - 0.5
+    
+    # Reverse the clipping: Since clipping limits values, we cannot fully recover original values if they were outside the [-0.5, 0.5] range. 
+    # However, for values within the range, we can reverse the scale by dividing by 3.
+    # We assume that the enhanced image has values within the range that the clip function allowed.
+    temp_image = temp_image / 3
+    
+    # Reverse the initial shift by adding 0.5 back
+    original_image = temp_image + 0.5
+    
+    return original_image
+
+def denormalize(normalized_image, original_min, original_max):
+    if original_max == original_min:
+        return normalized_image + original_min
+    else:
+        return (normalized_image * (original_max - original_min)) + original_min
+
+
+
+
+def unnormalize_colors(normalized_images, mean, std):
+
+    # # Reverse the normalization process
+    # unnormalized_images = normalized_images * (std + 1e-6) + mean
+    # return np.round(unnormalized_images).astype(np.uint8)
+
+    return (normalized_images*std)+mean
+
+
+
+
 def normalize_colors(images, mean=None, std=None):    
     if mean is None or std is None:
         mean      = np.mean(images, axis=0)
@@ -86,12 +120,6 @@ def normalize_colors(images, mean=None, std=None):
 
     return (images - mean)/(std+1e-6), mean, std
 
-
-
-def unnormalize_colors(normalized_images, mean, std): 
-    # Reverse the normalization process
-    unnormalized_images = normalized_images * (std + 1e-6) + mean
-    return np.round(unnormalized_images).astype(np.uint8)
 
 
 
@@ -121,8 +149,11 @@ def extract_substrings(input_string):
 
 obs_tmp = [] # array of the last two observations, 1st ele is the last
 
+img_tmp = []
+
 action_tmp = []
 
+blocks_data_tmp = []
 
 obs_occurences = {}
 
@@ -145,7 +176,7 @@ def generate_dataset():
     for ii in range(7):
 
 
-        nb_max_of_samplings = 51 # has to be ODD 
+        nb_max_of_samplings = 101 # has to be ODD 
 
         counter = 0
 
@@ -163,7 +194,14 @@ def generate_dataset():
         img, blocks_data = env.render()
         img = img[:,:,:3] # remove the transparancy
 
+        img_tmp.append(img)
+        if len(img_tmp) > 2:
+            img_tmp.pop(0)
 
+        blocks_data_tmp.append(blocks_data)
+        if len(blocks_data_tmp) > 2:
+            blocks_data_tmp.pop(0)
+            
         if str(blocks_data) not in obs_occurences.keys():
             obs_occurences[str(blocks_data)] = 1
 
@@ -198,6 +236,14 @@ def generate_dataset():
             img, blocks_data = env.render(action_was=action)
             img = img[:,:,:3]
 
+            img_tmp.append(img)
+            if len(img_tmp) > 2:
+                img_tmp.pop(0)
+
+            blocks_data_tmp.append(blocks_data)
+            if len(blocks_data_tmp) > 2:
+                blocks_data_tmp.pop(0)
+
 
             if str(blocks_data) not in obs_occurences.keys():
                 obs_occurences[str(blocks_data)] = 1
@@ -219,15 +265,25 @@ def generate_dataset():
             if counter%10 == 0:
                 print("counter: {}".format(str(counter)))
 
-            # if counter > 30:
+            # if counter > 10000:
             #     exit()
 
             counter += 1
 
-            # print("action for block {} was {}".format(str(counter), str(action)))
 
-            # plt.imsave("blocks_"+str(counter)+".png", img)
-            # plt.close()
+
+
+            # print(str(blocks_data_tmp[0][0]) == '[[a:block], [], [c:block, b:block]]')
+            # exit()
+
+            # if "unstack" in str(action) and str(blocks_data_tmp[0][0]) == '[[], [a:block], [c:block, b:block]]':
+            #     print("action UNSTACK for block {} was {}".format(str(counter), str(action)))
+
+            #     plt.imsave("blocks_unstack_"+str(counter)+"_pre.png", img_tmp[0])
+            #     plt.close()
+
+            #     plt.imsave("blocks_unstack_"+str(counter)+"_succ.png", img_tmp[1])
+            #     plt.close()
 
 
         all_traces.append([all_images_of_a_trace, all_actions_of_a_trace, all_obs_of_a_trace, all_layouts_of_a_trace])
@@ -236,10 +292,10 @@ def generate_dataset():
     print(obs_occurences)
     print(len(obs_occurences))
 
-    for kk in obs_occurences.keys():
-        print(kk)
+    # for kk in obs_occurences.keys():
+    #     print(kk)
 
-    exit()
+    # exit()
     return all_traces
 
 
@@ -319,14 +375,19 @@ def save_dataset(dire, traces):
     with open(dire+"/"+filename, mode="wb") as f:
         pickle.dump(data, f)
 
+    print("saved")
 
-# # 1) generate dataset (only once normally)
-all_traces = generate_dataset()
+    return
+
+# # # 1) generate dataset (only once normally)
+# all_traces = generate_dataset()
+
 
 # # 2) save dataset
 # save_dataset("blocks_dataset", all_traces)
 
-exit()
+# exit()
+
 
 # where we load the dataset, and adapt it to our needs
 def export_dataset():
@@ -361,9 +422,6 @@ def export_dataset():
         traces_indices.append([iii*len(trace[0]), (iii+1)*len(trace[0])])
         #start_time = time.time()
 
-        print(type(trace))
-        print(len(trace))
-        print()
 
         # all_images_of_a_trace, all_actions_of_a_trace, all_obs_of_a_trace, all_layouts_of_a_trace
         
@@ -408,7 +466,6 @@ def export_dataset():
     all_images_preproc, orig_max, orig_min = preprocess(all_images)
 
 
-
     all_images_color_norm, mean_all, std_all = normalize_colors(all_images_preproc, mean=None, std=None)
 
 
@@ -446,10 +503,6 @@ def export_dataset():
         all_pairs_of_images_of_trace, all_pairs_of_images_orig_of_trace, actions_one_hot_of_trace = modify_one_trace(all_images_transfo_tr, all_images_orig_tr, all_actions_transfo, all_layouts_tr, mean_all, std_all, all_actions_unique)
 
 
-        # print("ici")
-        # print(len(all_pairs_of_images_of_trace))
-        # print(len(actions_one_hot_of_trace))
-
         # exit()
 
         print("la")
@@ -460,26 +513,33 @@ def export_dataset():
 
 
 
-    return all_pairs_of_images, all_pairs_of_images_orig, all_actions_one_hot, mean_all, std_all, all_actions_unique
+    return all_pairs_of_images, all_pairs_of_images_orig, all_actions_one_hot, mean_all, std_all, all_actions_unique, orig_max, orig_min
 
 
 
-# all_pairs_of_images, all_pairs_of_images_orig, all_actions_one_hot, mean_all, std_all, all_actions_unique = export_dataset()
+# all_pairs_of_images, all_pairs_of_images_orig, all_actions_one_hot, mean_all, std_all, all_actions_unique, orig_max, orig_min = export_dataset()
 
 
 # print("lkeeeeeeee")
 
-# print(len(all_pairs_of_images))
+# # print(len(all_pairs_of_images))
+# print("ici")
+
+# for hh in range(10):
+
+#     # unorma = unnormalize_colors(all_pairs_of_images, mean_all, std_all)
+
+#     # dehanced = deenhance(unorma)
+
+#     # denorm = denormalize(dehanced, orig_min, orig_max)
 
 
-for hh in range(10):
 
-    #print("lool")
-    print(all_actions_unique[np.argmax(all_actions_one_hot[hh])])
-    plt.imsave("blocks_"+str(hh)+"_00.png", all_pairs_of_images_orig[hh][0])
-    plt.close()
+#     print(all_actions_unique[np.argmax(all_actions_one_hot[hh])])
+#     plt.imsave("blocks_"+str(hh)+"_00.png", all_pairs_of_images_orig[hh][0])
+#     plt.close()
 
-    plt.imsave("blocks_"+str(hh)+"_11.png", all_pairs_of_images_orig[hh][1])
-    plt.close()
+#     plt.imsave("blocks_"+str(hh)+"_11.png", all_pairs_of_images_orig[hh][1])
+#     plt.close()
 
-exit()
+# exit()

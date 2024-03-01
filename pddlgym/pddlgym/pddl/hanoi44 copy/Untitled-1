@@ -1,0 +1,10 @@
+
+   (clear peg3) (clear peg4) (clear d1) (clear d2)
+   (on d1 d2) (on d3 d4) (d2 on peg1) (d4 on peg2)
+
+
+
+   (clear peg3) (clear peg4) (clear d1) (clear d2)
+   (on d1 d2) (on d3 d4) (d2 on peg2) (d4 on peg1)
+
+

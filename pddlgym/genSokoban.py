@@ -10,6 +10,34 @@ import os
 def rescale(images):
     return images/255.
 
+
+
+
+
+def normalize(image):
+    # into 0-1 range
+    if image.max() == image.min():
+        return image - image.min()
+    else:
+        return (image - image.min())/(image.max() - image.min()), image.max(), image.min()
+
+def equalize(image):
+    from skimage import exposure
+    return exposure.equalize_hist(image)
+
+def enhance(image):
+    return np.clip((image-0.5)*3,-0.5,0.5)+0.5
+
+def preprocess(image):
+    image = np.array(image)
+    image = image / 255.
+    image = image.astype(float)
+    image = equalize(image)
+    image, orig_max, orig_min = normalize(image)
+    image = enhance(image)
+    return image, orig_max, orig_min
+
+
 #def reduce_resolution(images):
 
 
@@ -48,11 +76,15 @@ def normalize_colors(images, mean=None, std=None):
 
 
 
-def unnormalize_colors(normalized_images, mean, std): 
-    # Reverse the normalization process
-    unnormalized_images = normalized_images * (std + 1e-6) + mean
-    return np.round(unnormalized_images).astype(np.uint8)
+# def unnormalize_colors(normalized_images, mean, std): 
+#     # Reverse the normalization process
+#     unnormalized_images = normalized_images * (std + 1e-6) + mean
+#     return np.round(unnormalized_images).astype(np.uint8)
 
+
+def unnormalize_colors(normalized_images, mean, std): 
+
+    return (normalized_images*std)+mean
 
 
 
@@ -101,9 +133,9 @@ def stone_is_stuck(obs):
             return True
     return False
 
-nb_samplings_max_after_reset = 10 # has to be ODD 
+nb_samplings_max_after_reset = 20 # has to be ODD 
 
-total_nb_steps = 500
+total_nb_steps = 700
 
 
 def generate_dataset():
@@ -117,10 +149,12 @@ def generate_dataset():
     obs_occurences = {}
 
     steps_done = 0
+    loops_done = 0
 
     # pour 4 images, 3 actions
     # pour N images, N-1 actions
-
+    
+    iiiii=0
 
     # looping over the number of starting positions
     # for blocksworld only the 1st pb has 4 blocks
@@ -133,8 +167,10 @@ def generate_dataset():
         action_before = None
 
         # Initializing the first State
-        obs, debug_info = env.reset(_problem_idx=0)
+        obs, debug_info = env.reset(_problem_idx=iiiii)
 
+        iiiii = loops_done%4
+        loops_done+=1
 
         # Retrieve the 1st image
         img, layout = env.render()
@@ -144,7 +180,6 @@ def generate_dataset():
         if str(layout) not in unique_obs:
             unique_obs.append(str(layout))
             obs_occurences[str(layout)] = 1
-
 
         # plt.imsave("sokoban_111111.png", img)
         # plt.close()
@@ -168,19 +203,18 @@ def generate_dataset():
             while(is_going_back(action_before, action)):
                 action = env.action_space.sample(obs)
 
-            # Capture the end time
-            inter_time = time.time()
-            # Calculate the duration by subtracting the start time from the end time
-            duration = inter_time - start_time
-            print(f"The inter time 0 is {duration} seconds.")
+            # # Capture the end time
+            # inter_time = time.time()
+            # # Calculate the duration by subtracting the start time from the end time
+            # duration = inter_time - start_time
+            # print(f"The inter time 0 is {duration} seconds.")
 
             # add the actions to all_*
-            all_actions_of_a_trace.append(action)
+            
 
             # apply the action and retrieve img and obs
             obs, reward, done, debug_info = env.step(action)
             steps_done += 1
-
 
 
             # if stone stuck
@@ -188,11 +222,11 @@ def generate_dataset():
                 nb_times_stone_stuck += 1
             
 
-            # Capture the end time
-            inter_time = time.time()
-            # Calculate the duration by subtracting the start time from the end time
-            duration = inter_time - start_time
-            print(f"The inter time 1 is {duration} seconds.")
+            # # Capture the end time
+            # inter_time = time.time()
+            # # Calculate the duration by subtracting the start time from the end time
+            # duration = inter_time - start_time
+            # print(f"The inter time 1 is {duration} seconds.")
 
 
             img, layout = env.render()
@@ -200,11 +234,11 @@ def generate_dataset():
 
 
 
-            # Capture the end time
-            inter_time = time.time()
-            # Calculate the duration by subtracting the start time from the end time
-            duration = inter_time - start_time
-            print(f"The inter time 2 is {duration} seconds.")
+            # # Capture the end time
+            # inter_time = time.time()
+            # # Calculate the duration by subtracting the start time from the end time
+            # duration = inter_time - start_time
+            # print(f"The inter time 2 is {duration} seconds.")
 
 
             # plt.imsave("sokoban_"+str(steps_done)+".png", img)
@@ -217,17 +251,19 @@ def generate_dataset():
             else:
                 obs_occurences[str(layout)] += 1
 
-
+            all_actions_of_a_trace.append(action)
             all_images_of_a_trace.append(img)
             all_layouts_of_a_trace.append(layout)
             all_obs_of_a_trace.append(obs.literals)
 
+            if steps_done%20==0:
+                print("{} steps done".format(str(steps_done)))
 
-            # Capture the end time
-            end_time = time.time()
-            # Calculate the duration by subtracting the start time from the end time
-            duration = end_time - start_time
-            print(f"The code block took {duration} seconds to execute.")
+            # # Capture the end time
+            # end_time = time.time()
+            # # Calculate the duration by subtracting the start time from the end time
+            # duration = end_time - start_time
+            # print(f"The code block took {duration} seconds to execute.")
 
             action_before = action
 
@@ -237,9 +273,8 @@ def generate_dataset():
 
         all_traces.append([all_images_of_a_trace, all_actions_of_a_trace, all_obs_of_a_trace, all_layouts_of_a_trace])
     
-    print(obs_occurences)
-
-    exit()
+    #print(obs_occurences)
+    print(len(obs_occurences))
 
     return all_traces
 
@@ -252,32 +287,17 @@ def generate_dataset():
 # and possibly construct special actions 
 # Input: all_images, all_actions, all_layouts
 # Return: pairs of images, corresponding actions (one-hot)
-def modify_one_trace(all_images, all_actions, all_layouts, mean_all, std_all, all_actions_unique_):
+def modify_one_trace(all_images_transfo_tr, all_images_orig_tr, all_actions, all_layouts, mean_all, std_all, all_actions_unique_):
     
-    # 1) preprocess images
-    all_images = np.array(all_images)
-
-    all_images_orig = np.copy(all_images)
-
-    ## reduce dimension
-    all_images = all_images[:, ::4, ::4, :]
-
-    ## grey the images (optional) or black&white
-    # all_images = rgb_to_grayscale(all_images)
-    # all_images = to_black_and_white(all_images)
-
-    ## normalize by color
-    all_images, mean_, std_ = normalize_colors(all_images, mean_all, std_all)
-
     
     # building the array of pairs
     all_pairs_of_images = []
     all_pairs_of_images_orig = []
-    for iiii, p in enumerate(all_images):
+    for iiii, p in enumerate(all_images_transfo_tr):
         #if iiii%2 == 0:
-        if iiii < len(all_images)-1:
-            all_pairs_of_images.append([all_images[iiii], all_images[iiii+1]])
-            all_pairs_of_images_orig.append([all_images_orig[iiii], all_images_orig[iiii+1]])
+        if iiii < len(all_images_transfo_tr)-1:
+            all_pairs_of_images.append([all_images_transfo_tr[iiii], all_images_transfo_tr[iiii+1]])
+            all_pairs_of_images_orig.append([all_images_orig_tr[iiii], all_images_orig_tr[iiii+1]])
 
     # plt.imsave("soko_pair0_1.png", all_pairs_of_images[1][1])
     # plt.close()
@@ -297,7 +317,7 @@ def modify_one_trace(all_images, all_actions, all_layouts, mean_all, std_all, al
     # array of one hot encoded actions
     actions_one_hot = F.one_hot(actions_indexes, num_classes=len(all_actions_unique_))
 
-    return all_pairs_of_images, all_pairs_of_images_orig, actions_one_hot
+    return all_pairs_of_images, all_pairs_of_images_orig, actions_one_hot.numpy()
 
 
 def load_dataset(path_to_file):
@@ -335,24 +355,21 @@ def save_dataset(dire, traces):
 
 
 
-# # 1) generate dataset (only once normally)
-all_traces = generate_dataset()
+# # # 1) generate dataset (only once normally)
+# all_traces = generate_dataset()
 
 
-exit()
+# #2) save dataset
+# save_dataset("sokoban_dataset", all_traces)
 
-# 2) save dataset
-#save_dataset("sokoban_dataset", all_traces)
-
+# exit()
 
 def export_dataset():
 
     # 3) load
     loaded_dataset = load_dataset("/workspace/pddlgym-tests/pddlgym/sokoban_dataset/data.p")
 
-    # for trace in load_dataset:
-    #     all_images = trace[0]
-    #     # all_images_of_a_trace, all_actions_of_a_trace, all_obs_of_a_trace, all_layouts_of_a_trace
+    # all_images_of_a_trace, all_actions_of_a_trace, all_obs_of_a_trace, all_layouts_of_a_trace
 
     # 4) modify the dataset
 
@@ -364,20 +381,33 @@ def export_dataset():
     all_pairs_of_images_orig = []
     all_actions_one_hot = []
     all_actions_unique = []
-
-
-
+    traces_indices = []
 
 
     # first loop to compute the whole dataset mean and std
-    for trace in loaded_dataset["traces"]:
+    for iii, trace in enumerate(loaded_dataset["traces"]):
         # all_images[:, ::4, ::4, :]
+        traces_indices.append([iii*len(trace[0]), (iii+1)*len(trace[0])])
        
+
+
+        print(np.array(trace[0]).shape) # (19, 262, 262, 3)
+
         all_images.extend(np.array(trace[0])[:, ::4, ::4, :])
+
         all_actions.extend(trace[1])
 
-    _, mean_all, std_all = normalize_colors(all_images, mean=None, std=None)
+    all_images = np.array(all_images) / 255
 
+
+    #all_images_preproc, orig_max, orig_min = preprocess(all_images)
+
+    all_images_color_norm, mean_all, std_all = normalize_colors(all_images, mean=None, std=None)
+    # print("onestla")
+    # print(all_images_color_norm[0])
+
+    #filtered_values = all_images_color_norm[0][(all_images_color_norm[0] != 1.0) & (all_images_color_norm[0] != 0.0)]
+    #print(filtered_values)
 
     #build array containing all actions (no duplicate)
     for uuu, act in enumerate(all_actions):
@@ -385,7 +415,10 @@ def export_dataset():
             all_actions_unique.append(str(act))
 
     # second loop to construct the pairs
-    for trace in loaded_dataset["traces"]:
+    for iiii, trace in enumerate(loaded_dataset["traces"]):
+
+        all_images_transfo_tr = all_images_color_norm[traces_indices[iiii][0]:traces_indices[iiii][1]]
+        all_images_orig_tr = all_images[traces_indices[iiii][0]:traces_indices[iiii][1]]
 
         all_images_tr = trace[0]
         all_actions_tr = trace[1]
@@ -393,13 +426,9 @@ def export_dataset():
         all_layouts_tr = trace[3]
         # all_images_of_a_trace, all_actions_of_a_trace, all_obs_of_a_trace, all_layouts_of_a_trace
 
-        all_pairs_of_images_of_trace, all_pairs_of_images_orig_of_trace, actions_one_hot_of_trace = modify_one_trace(all_images_tr, all_actions_tr, all_layouts_tr, mean_all, std_all, all_actions_unique)
+        all_pairs_of_images_of_trace, all_pairs_of_images_orig_of_trace, actions_one_hot_of_trace = modify_one_trace(all_images_transfo_tr, all_images_orig_tr, all_actions_tr, all_layouts_tr, mean_all, std_all, all_actions_unique)
 
-        print("ici")
-        print(len(all_pairs_of_images_of_trace))
-        print(len(actions_one_hot_of_trace))
 
-        print("la")
         all_pairs_of_images.extend(all_pairs_of_images_of_trace)
         all_pairs_of_images_orig.extend(all_pairs_of_images_orig_of_trace)
         all_actions_one_hot.extend(actions_one_hot_of_trace)
@@ -409,3 +438,38 @@ def export_dataset():
 
     return all_pairs_of_images, all_pairs_of_images_orig, all_actions_one_hot, mean_all, std_all, all_actions_unique
 
+
+
+
+
+# all_pairs_of_images, all_pairs_of_images_orig, all_actions_one_hot, mean_all, std_all, all_actions_unique = export_dataset()
+
+
+# for hh in range(0, 20, 5):
+
+#     acc = all_actions_unique[np.argmax(all_actions_one_hot[hh])]
+#     print("action for {} is {}".format(str(hh), str(acc)))
+
+    
+#     print(all_pairs_of_images[0])
+#     # im1_orig = all_pairs_of_images_orig[hh][0]
+#     # im2_orig = all_pairs_of_images_orig[hh][1]
+#     unorma_images = unnormalize_colors(all_pairs_of_images, mean_all, std_all)
+    
+#     print("unorma_images[0]")
+#     print(unorma_images[0])
+
+#     im1_orig = unorma_images[hh][0]
+#     im2_orig = unorma_images[hh][1]
+
+#     # plt.imsave("hanoi_pair_"+str(hh)+"_pre.png", im1_orig)
+#     # plt.close()
+
+#     # plt.imsave("hanoi_pair_"+str(hh)+"_suc.png", im2_orig)
+#     # plt.close()
+
+#     plt.imsave("hanoi_pair_"+str(hh)+"_pre.png", im1_orig)
+#     plt.close()
+
+#     plt.imsave("hanoi_pair_"+str(hh)+"_suc.png", im2_orig)
+#     plt.close()

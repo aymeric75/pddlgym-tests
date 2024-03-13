@@ -145,6 +145,7 @@ def draw_blocks(ax, block_width, block_height, block_positions):
         ax.add_patch(rect)
         ax.annotate(label, xy=(x+block_width/2, y+block_height/2), color=(1,1,1), weight='bold', fontsize=40, verticalalignment="center", horizontalalignment="center")
 
+
 def render(obs, mode='human', close=False, action_was=None):
 
     width, height = 3.2, 3.2
@@ -199,6 +200,53 @@ def render(obs, mode='human', close=False, action_was=None):
     #         # print("THE PILE AFTER")
     #         # print(piles) # 
           
+
+    block_width, block_height, block_positions = get_block_params(piles, width, height, 
+        table_height, robot_height)
+
+    robot_width = block_width * 1.4
+    robot_midx = width / 2
+    robot_midy = height - robot_height/2
+
+    draw_table(ax, width, table_height)
+    draw_blocks(ax, block_width, block_height, block_positions)
+    draw_robot(ax, robot_width, robot_height, robot_midx, robot_midy, holding,
+        block_width, block_height)
+
+    plt.close()
+
+
+    # print(piles) # [[a:block], [b:block], [c:block]]
+    # print(holding) # 
+
+
+
+    return fig2data(fig), (piles, holding)
+
+
+
+
+
+def render3(obs, mode='human', close=False, action_was=None):
+
+    width, height = 3.2, 3.2
+    fig = plt.figure(figsize=(width, height))
+    ax = fig.add_axes((0.0, 0.0, 1.0, 1.0),
+                                aspect='equal', frameon=False,
+                                xlim=(-0.05, width + 0.05),
+                                ylim=(-0.05, height + 0.05))
+    for axis in (ax.xaxis, ax.yaxis):
+        axis.set_major_formatter(plt.NullFormatter())
+        axis.set_major_locator(plt.NullLocator())
+
+    #table_height = height * 0.15
+    table_height = height * 0.
+    robot_height = height * 0.1
+    #robot_height = height * 0.
+
+    piles, holding = get_objects_from_obs(obs)
+    
+    
 
     block_width, block_height, block_positions = get_block_params(piles, width, height, 
         table_height, robot_height)

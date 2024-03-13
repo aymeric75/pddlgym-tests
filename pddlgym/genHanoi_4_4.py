@@ -11,7 +11,170 @@ from concurrent.futures import ProcessPoolExecutor
 import random
 import torch
 import torch.nn.functional as F
-from skimage import exposure
+from skimage import exposure, color
+import itertools
+
+
+def all_colors():
+    #colors = [0, 64, 128, 192, 255]
+    colors = [0, 128, 255]
+    combinations = list(itertools.product(colors, repeat=3))
+    return combinations
+
+# Define a function to convert an RGB combination to LAB
+def convert_to_lab(rgb):
+    # skimage expects RGB values to be normalized between 0 and 1
+    normalized_rgb = [value / 255.0 for value in rgb]
+    # Reshape the RGB tuple to a 1x1x3 numpy array as required by rgb2lab
+    rgb_array = np.array([normalized_rgb]).reshape((1, 1, 3))
+    lab_array = color.rgb2lab(rgb_array)
+    # Return the LAB value, flattened back into a simple tuple
+    return tuple(lab_array.flatten())
+
+
+lab_combinations = list(map(convert_to_lab, all_colors()))
+
+counntteerr = 0
+
+
+ref_colors = [
+    [ 0 ,  0, 255],
+    [  0 ,255 ,0],
+    [  0 ,255 ,  0],
+    [128  ,128 ,128],
+    [255, 0, 0],
+    [255 ,255  , 0],
+    [128, 255, 255]]
+
+
+shades = [[128, 0, 255],
+    [128, 255, 0],
+    [0, 128, 0],
+    [255, 128, 128],
+    [128, 0, 0],
+     [128, 255, 0],
+     [128, 128, 255]]
+
+
+def convert_to_lab_and_to_color_wt_min_distance(rgb, boolean_matrix):
+
+    global counntteerr
+
+    if counntteerr % 100000 == 0:
+        print("counter is {}".format(str(counntteerr)))
+
+    if counntteerr == len(boolean_matrix):
+        return rgb
+
+    #if counntteerr < len(boolean_matrix):
+    if boolean_matrix[counntteerr]:
+
+
+
+        if (rgb == np.array(ref_colors[0])).all():
+            counntteerr+=1
+            return np.array(shades[0])
+
+        elif (rgb == np.array(ref_colors[1])).all():
+            counntteerr+=1
+            return np.array(shades[1])
+
+        elif (rgb == np.array(ref_colors[2])).all():
+            counntteerr+=1
+            return np.array(shades[2])
+
+        elif (rgb == np.array(ref_colors[3])).all():
+            counntteerr+=1
+            return np.array(shades[3])
+
+        elif (rgb == np.array(ref_colors[4])).all():
+            counntteerr+=1
+            return np.array(shades[4])
+
+        elif (rgb == np.array(ref_colors[5])).all():
+            counntteerr+=1
+            return np.array(shades[5])
+
+        elif (rgb == np.array(ref_colors[6])).all():
+            counntteerr+=1
+            return np.array(shades[6])
+
+
+
+
+        lab_array = color.rgb2lab(rgb)
+        all_dists = all_distances(lab_array)
+        # put the "0" dist to infinit (coz we dont want to spot this one)
+        if 0 in all_dists:
+            all_dists[all_dists.index(0)] = 99999
+        # retrieve the index of the min distance (expect when is equal)
+        index_min_color = np.argmin(all_dists)
+        closest_color = all_colors()[index_min_color]
+        counntteerr+=1
+        return closest_color
+    
+    else:
+        counntteerr+=1
+        return rgb
+
+
+
+def all_distances(labcolor):
+
+    all_distances_lab = list(map(lambda x: color.deltaE_cie76(labcolor, x), lab_combinations))
+    #all_distances_lab = list(map(lambda x: color.deltaE_ciede2000(labcolor, x), lab_combinations))
+    #all_distances_lab = list(map(lambda x: color.deltaE_ciede94(labcolor, x), lab_combinations))
+
+    return all_distances_lab
+
+
+
+def add_noise(images, seed=0):
+
+    np.random.seed(seed)
+
+    # Reshape the array to have each row represent a pixel's color
+    pixels = images[0].reshape(-1, 3)
+    # Find unique color combinations
+    unique_colors = np.unique(pixels, axis=0)
+    print("luu")
+    print(unique_colors)
+    #exit()
+
+    if not isinstance(images, np.ndarray):
+        images = np.array(images)
+
+    # print(images.shape) # (768, 25, 70, 3)
+    # # boolean_matrix 
+
+
+
+    # convert the image dataset into a "lab" format 
+
+    reshaped_rgb = images.reshape(-1, 3)  # Reshape to a 2D array where each row is a pixel's RGB values
+    print(reshaped_rgb.shape) # 5 082 000
+
+
+    # Generate a matrix of random numbers from a uniform distribution
+    random_matrix = np.random.uniform(low=0.0, high=1.0, size=(reshaped_rgb.shape[0],))
+    # Create a boolean matrix: True if the element is < 0.05, False otherwise
+    boolean_matrix = random_matrix < 0.01
+    #print(boolean_matrix)
+
+    lab_pixels = np.apply_along_axis(convert_to_lab_and_to_color_wt_min_distance, 1, reshaped_rgb, boolean_matrix)
+    
+
+
+    #print("seed {}, images.shape {}, reshaped_rgb {}, lab_pixels {}, bool matrix {}".format(str(seed), str(images.shape), str(reshaped_rgb.shape), str(lab_pixels.shape), str(boolean_matrix.shape)))
+
+
+    #dataset_lab = lab_pixels.reshape(768, 25, 70, 3)
+    dataset_lab = lab_pixels.reshape(images.shape)
+
+    # NOW holds the closests values  
+
+    return dataset_lab
+
 
 def normalize(image):
     # into 0-1 range
@@ -20,28 +183,42 @@ def normalize(image):
     else:
         return (image - image.min())/(image.max() - image.min()), image.max(), image.min()
 
-def equalize(image):
+def equalize(image, histo_bins=None):
     return exposure.equalize_hist(image)
 
 def enhance(image):
     return np.clip((image-0.5)*3,-0.5,0.5)+0.5
 
-def preprocess(image):
-    image = np.array(image)
-    image = image / 255.
+def preprocess(image, histo_bins=256):
+
+    if not isinstance(image,np.ndarray):
+        image = np.array(image)
+
+    # compte le nombre de couleurs
+    # pour chacune, tu donne une version modifiée (voir l'autre fct là)
+    # pour le nbre de bins, bah c'est le nbre de couleurs
+
+
+    image = image / 255. # put the image to between 0 and 1 (with the assumption that vals are 0-255)
     image = image.astype(float)
-    image = equalize(image)
-    image, orig_max, orig_min = normalize(image)
-    image = enhance(image)
+    #print(np.unique(image))
+    image = equalize(image, histo_bins=14)
+    #print(np.unique(image))
+    image, orig_max, orig_min = normalize(image) # put the image back to btween 0 and 1
+    #print(np.unique(image))
+    image = enhance(image) # i) from btween 0-1 values, center to 0 (so become btween -0.5 +0.5)
+    #print(np.unique(image))
+    #exit()
+
     return image, orig_max, orig_min
 
 
 def gaussian(a, sigma=0.3):
-    if sigma == 20:
+    if sigma == 5:
         np.random.seed(1)
-    elif sigma == 30:
+    elif sigma == 7:
         np.random.seed(2)
-    elif sigma == 40:
+    elif sigma == 10:
         np.random.seed(3)
     return np.random.normal(0,sigma,a.shape) + a
 
@@ -75,10 +252,13 @@ def unnormalize_colors(normalized_images, mean, std):
 
 
 
-def normalize_colors(images, mean=None, std=None):    
+def normalize_colors(images, mean=None, std=None, second=False):    
+
     if mean is None or std is None:
+
         mean      = np.mean(images, axis=0)
         std       = np.std(images, axis=0)
+
     return (images - mean)/(std+1e-20), mean, std
 
 
@@ -86,6 +266,7 @@ def normalize_colors(images, mean=None, std=None):
 
 # Function to reduce resolution of a single image using np.take
 def reduce_resolution(image):
+
     # Use np.take to select every 4th element in the first two dimensions
     reduced_image = np.take(np.take(image, np.arange(0, image.shape[0], 9), axis=0),
                             np.arange(0, image.shape[1], 9), axis=1)
@@ -195,7 +376,7 @@ def generate_dataset():
 
             if len(last_two_peg_to_disc_lists_str) == 2:
 
-                if str(last_two_peg_to_disc_lists_str) not in unique_transitions:
+                if str(last_two_peg_to_disc_lists_str) not in unique_transitions and str(last_two_peg_to_disc_lists[0]) != str(last_two_peg_to_disc_lists[1]):
 
                     transition_actions = [] # hold all the version of the action
                     # i.e. loose, semi-loose-v1, semi-loose-v2
@@ -224,7 +405,7 @@ def generate_dataset():
 
     with open("resultatHanoi4-4.txt", 'w') as file2:
 
-        file2.write(str(unique_transitions) + '\n')
+        file2.write(str(len(unique_transitions)) + '\n')
 
     return all_traces, obs_occurences, unique_obs_img, unique_transitions
 
@@ -233,13 +414,23 @@ def generate_dataset():
 # construct pairs (of images)
 # and construct the array of action (for each pair of images) 
 # Return: pairs of images, corresponding actions (one-hot)
+
 def modify_one_trace(all_images_transfo_tr, all_images_orig_tr, all_actions, all_actions_unique_):
 
+    #print(type(all_images_transfo_tr))
     # building the array of pairs
     all_pairs_of_images = []
     all_pairs_of_images_orig = []
     for iiii, p in enumerate(all_images_transfo_tr):
         if iiii%2 == 0:
+
+
+            # mask = all_images_transfo_tr[iiii+1] > 1000
+            # result = all_images_transfo_tr[iiii+1][mask]
+            # if len(result) > 0:
+            #     print(result)
+            #     exit()
+
             #if iiii < len(all_images_transfo_tr)-1:
             all_pairs_of_images.append([all_images_transfo_tr[iiii], all_images_transfo_tr[iiii+1]])
             all_pairs_of_images_orig.append([all_images_orig_tr[iiii], all_images_orig_tr[iiii+1]])
@@ -278,6 +469,17 @@ def save_dataset(dire, traces, obs_occurences, unique_obs_img, unique_transition
         pickle.dump(data, f)
 
 
+def save_noisy(dire, filename, images):
+    data = {
+        "images": images
+    }
+    if not os.path.exists(dire):
+        os.makedirs(dire) 
+    with open(dire+"/"+filename, mode="wb") as f:
+        pickle.dump(data, f)
+
+
+
 # # 1) generate dataset (only once normally)
 # all_traces, obs_occurences, unique_obs_img, unique_transitions = generate_dataset()
 
@@ -290,20 +492,9 @@ def save_dataset(dire, traces, obs_occurences, unique_obs_img, unique_transition
 def create_a_trace():
     # 3) load
     loaded_dataset = load_dataset("/workspace/pddlgym-tests/pddlgym/hanoi_4_4_dataset/data.p")
-    all_images_reduced = []
-    all_actions = []
-    all_pairs_of_images = []
-    all_pairs_of_images_reduced_orig = []
-    all_actions_one_hot = []
-    all_actions_unique = []
-    traces_indices = []
-    traces_actions_indices = []
-    start_trace_index = 0
-    start_trace_action_index = 0
-    all_actions_for_trace = []
+
     # first loop to compute the whole dataset mean and std
     for iii, trace in enumerate(loaded_dataset["traces"]):
-        # traces_actions_indices
         for trtrtr, transitio in enumerate(trace):
             plt.imsave("hanoi_pair_"+str(trtrtr)+"_pre.png", reduce_resolution(transitio[0][0]))
             plt.close()
@@ -321,6 +512,7 @@ def create_a_trace():
 
 def export_dataset(action_type="full"):
 
+    global counntteerr
 
     loaded_dataset = load_dataset("/workspace/pddlgym-tests/pddlgym/hanoi_4_4_dataset/data.p")
 
@@ -337,6 +529,8 @@ def export_dataset(action_type="full"):
     start_trace_action_index = 0
     all_actions_for_trace = []
 
+    total_number_unique_transitions = 0
+
     # first loop to compute the whole dataset mean and std
     for iii, trace in enumerate(loaded_dataset["traces"]):
 
@@ -349,6 +543,8 @@ def export_dataset(action_type="full"):
         actions_for_one_trace = []
 
         for trtrtr, transitio in enumerate(trace):
+
+
 
             all_images_reduced.append(reduce_resolution(transitio[0][0])) # = im1
             all_images_reduced.append(reduce_resolution(transitio[0][1])) # = im2
@@ -372,38 +568,131 @@ def export_dataset(action_type="full"):
                 all_actions.append(str(transitio[1][3]))
                 actions_for_one_trace.append(str(transitio[1][3]))
 
+
+            if str(transitio[1][3]) not in all_actions_unique:
+                all_actions_unique.append(str(transitio[1][3]))
+
+                # if len(all_actions_unique) < 3000:
+
+                #     combined_image = np.concatenate((reduce_resolution(transitio[0][0]), reduce_resolution(transitio[0][1])), axis=1)
+                #     plt.imsave("alltransi/hanoi-4-4-transi"+str(len(all_actions_unique))+".png", combined_image)
+                
         all_actions_for_trace.append(actions_for_one_trace)
 
     unique_obs_img = loaded_dataset["unique_obs_img"]
 
 
+
+
     reduced_uniques = []
     for uniq in unique_obs_img:
 
-        reduced_uniques.append(np.clip(gaussian(reduce_resolution(uniq), 20), 0, 255))
-        reduced_uniques.append(np.clip(gaussian(reduce_resolution(uniq), 30), 0, 255))
-        reduced_uniques.append(np.clip(gaussian(reduce_resolution(uniq), 40), 0, 255))
+        # reduced_uniques.append(np.clip(gaussian(reduce_resolution(uniq), 0.1), 0, 255))
+        # reduced_uniques.append(np.clip(gaussian(reduce_resolution(uniq), 0.2), 0, 255))
+        # reduced_uniques.append(np.clip(gaussian(reduce_resolution(uniq), 0.3), 0, 255))
 
 
-    unique_obs_img_preproc, orig_max, orig_min = preprocess(reduced_uniques)
+        reduced_uniques.append(reduce_resolution(uniq))
+        reduced_uniques.append(reduce_resolution(uniq))
+        reduced_uniques.append(reduce_resolution(uniq))
+
+    print("ii1")
+
+    #######
+
+    #####
+    #####  0 128 256
+
+    print(np.unique(reduced_uniques[0]))
+    print(reduced_uniques[0].shape)
+
+    # for i in range(3):
+    #     for j in range(25):
+    #         for f in range(70):
+    #             if reduced_uniques[0][j][f][i] != 255 and reduced_uniques[0][j][f][i] != 0 and reduced_uniques[0][j][f][i] != 128:
+    #                 print(reduced_uniques[0][j][f][i])
+
+    # counntteerr=0
+    # noisy_uniques = add_noise(reduced_uniques, seed=1)
+    # counntteerr=0
+    # np.append(noisy_uniques, add_noise(reduced_uniques, seed=2))
+    # counntteerr=0
+    # np.append(noisy_uniques, add_noise(reduced_uniques, seed=3))
+
+    # save_noisy("hanoi_4_4_dataset", "uniques.p", noisy_uniques)
+
+
+    # loaded_noisy = load_dataset("/workspace/pddlgym-tests/pddlgym/hanoi_4_4_dataset/uniques.p")
+    # noisy_uniques = loaded_noisy["images"]
+    # plt.imsave("HHHH_pre.png", iiimages[0])
+    # plt.close()
+
+    noisy_uniques = reduced_uniques
+
+    unique_obs_img_preproc, orig_max, orig_min = preprocess(noisy_uniques, histo_bins=24)
     unique_obs_img_color_norm, mean_all, std_all = normalize_colors(unique_obs_img_preproc, mean=None, std=None)
 
+
+
+    print("ii2")
     # all_images_reduced > gaussian > clip > preprocess > normalize_colors
 
-    all_images_reduced = np.array(all_images_reduced)
-    # 
-    all_images_reduced_gaussian_20 = np.clip(gaussian(all_images_reduced, 20), 0, 255)
-    all_images_reduced_gaussian_30 = np.clip(gaussian(all_images_reduced, 30), 0, 255)
-    all_images_reduced_gaussian_40 = np.clip(gaussian(all_images_reduced, 40), 0, 255)
+   
+    # counntteerr=0
+    # all_images_reduced_gaussian_20 = add_noise(all_images_reduced, seed=1)
+    # counntteerr=0
+    # all_images_reduced_gaussian_30 = add_noise(all_images_reduced, seed=2)
+    # counntteerr=0
+    # all_images_reduced_gaussian_40 = add_noise(all_images_reduced, seed=3)
 
-    all_images_reduced_gaussian_20_preproc, _, _ = preprocess(all_images_reduced_gaussian_20)
-    all_images_reduced_gaussian_20_norm, __, __ = normalize_colors(all_images_reduced_gaussian_20_preproc, mean=mean_all, std=std_all)
-    
-    all_images_reduced_gaussian_30_preproc, _, _ = preprocess(all_images_reduced_gaussian_30)
+    # save_noisy("hanoi_4_4_dataset", "all_images_seed1.p", all_images_reduced_gaussian_20)
+    # save_noisy("hanoi_4_4_dataset", "all_images_seed2.p", all_images_reduced_gaussian_30)
+    # save_noisy("hanoi_4_4_dataset", "all_images_seed3.p", all_images_reduced_gaussian_40)
+
+
+    # loaded_noisy1 = load_dataset("/workspace/pddlgym-tests/pddlgym/hanoi_4_4_dataset/all_images_seed1.p")
+    # all_images_seed1 = loaded_noisy1["images"]
+
+    # loaded_noisy2 = load_dataset("/workspace/pddlgym-tests/pddlgym/hanoi_4_4_dataset/all_images_seed2.p")
+    # all_images_seed2 = loaded_noisy2["images"]
+
+    # loaded_noisy3 = load_dataset("/workspace/pddlgym-tests/pddlgym/hanoi_4_4_dataset/all_images_seed3.p")
+    # all_images_seed3 = loaded_noisy3["images"]
+
+
+
+
+    all_images_reduced_gaussian_20_preproc, _, _ = preprocess(all_images_reduced, histo_bins=256)
+    all_images_reduced_gaussian_20_norm, __, __ = normalize_colors(all_images_reduced_gaussian_20_preproc, mean=mean_all, std=std_all, second=True)
+
+
+    all_images_reduced_gaussian_30_preproc, _, _ = preprocess(all_images_reduced, histo_bins=256)
     all_images_reduced_gaussian_30_norm, __, __ = normalize_colors(all_images_reduced_gaussian_30_preproc, mean=mean_all, std=std_all)
 
-    all_images_reduced_gaussian_40_preproc, _, _ = preprocess(all_images_reduced_gaussian_40)
+    all_images_reduced_gaussian_40_preproc, _, _ = preprocess(all_images_reduced, histo_bins=256)
     all_images_reduced_gaussian_40_norm, __, __ = normalize_colors(all_images_reduced_gaussian_40_preproc, mean=mean_all, std=std_all)
+
+
+
+    # for tr1 in all_images_reduced_gaussian_40_norm:
+    #     print(tr1.shape)
+    #     print(np.max(tr1))
+    #     print(np.min(tr1))
+    #     exit()
+    # print(unique_obs_img_color_norm)
+    # exit()
+
+
+
+    # print("ii3")
+    # for im in all_images_reduced_gaussian_30_norm:
+    #     mask = im[0] > 1000
+    #     result = im[0][mask]
+    #     if len(result) > 0:
+    #         print(result)
+
+    # exit()
+
 
     #build array containing all actions WITHOUT DUPLICATE
     for uuu, act in enumerate(all_actions):
@@ -419,7 +708,7 @@ def export_dataset(action_type="full"):
     # second loop to process the pairs
     for iiii, trace in enumerate(loaded_dataset["traces"]):
 
-
+        print("ii4")
         all_images_transfo_tr_gaussian20 = all_images_reduced_gaussian_20_norm[traces_indices[iiii][0]:traces_indices[iiii][1]]
         all_images_orig_reduced_tr = all_images_reduced[traces_indices[iiii][0]:traces_indices[iiii][1]]
 
@@ -466,21 +755,20 @@ def export_dataset(action_type="full"):
     
 
 
+
     return train_set, test_val_set, all_pairs_of_images_reduced_orig, all_actions_one_hot, mean_all, std_all, all_actions_unique, orig_max, orig_min
-
-
-# create_a_trace()
 
 
 #train_set, test_val_set, all_pairs_of_images_reduced_orig, all_actions_one_hot, mean_all, std_all, all_actions_unique, orig_max, orig_min = export_dataset()
 
-# # # # 352
-# # # print(len(all_actions_unique))
+
+# #print(train_set[0][0][0])
+
+# print(len(train_set)) # 2904
 
 
 
-
-# for hh in range(0, len(train_set), 50):
+# for hh in range(0, len(train_set), 500):
 
 #     acc = all_actions_unique[np.argmax(train_set[hh][1])]
 #     print("action for {} is {}".format(str(hh), str(acc)))
@@ -492,8 +780,16 @@ def export_dataset(action_type="full"):
 
 #     im1 = unnormalize_colors(im1, mean_all, std_all)
 #     im1 = deenhance(im1)
+#     print(im1)
+
+#     plt.imsave("hanoi_4-4-pair_EEEEEEEE"+str(hh)+"_pre.png", im1)
+#     plt.close()
+
+#     exit()
+#     im1 = deenhance(im1)
 #     im1 = denormalize(im1, orig_min, orig_max)
 #     im1 = np.clip(im1, 0, 1)
+
     
 #     im2 = unnormalize_colors(im2, mean_all, std_all)
 #     im2 = deenhance(im2)
@@ -501,35 +797,13 @@ def export_dataset(action_type="full"):
 #     im2 = np.clip(im2, 0, 1)
 
 
-#     plt.imsave("hanoi_pair_"+str(hh)+"_pre.png", im1)
+#     plt.imsave("hanoi_4-4-pair_"+str(hh)+"_pre.png", im1)
 #     plt.close()
 
-#     plt.imsave("hanoi_pair_"+str(hh)+"_suc.png", im2)
+#     plt.imsave("hanoi_4-4-pair_"+str(hh)+"_suc.png", im2)
 #     plt.close()
-
-#     #
 
 
 # exit()
 
 
-
-
-# for hh in range(0, len(all_pairs_of_images_reduced_orig), 500):
-
-#     acc = all_actions_unique[np.argmax(all_actions_one_hot[hh])]
-#     print("action for {} is {}".format(str(hh), str(acc)))
-
-#     im1_orig=all_pairs_of_images_reduced_orig[hh][0]
-#     im2_orig=all_pairs_of_images_reduced_orig[hh][1]
-
-#     plt.imsave("hanoi_pair_"+str(hh)+"_pre.png", im1_orig)
-#     plt.close()
-
-#     plt.imsave("hanoi_pair_"+str(hh)+"_suc.png", im2_orig)
-#     plt.close()
-
-#     #
-
-
-# exit()

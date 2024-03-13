@@ -15,5 +15,5 @@
    (on d4 peg4) (on d1 d2) (on d2 d3) (on d3 d4)
 
   )
-  (:goal (and (on d1 d2) (on d2 d3) (on d3 peg3)  ))
+  (:goal (and (on d3 d4) (on d2 peg2) (on d4 peg1) (on d1 peg4) ))
   ) 

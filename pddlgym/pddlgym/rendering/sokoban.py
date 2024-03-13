@@ -178,3 +178,28 @@ def render(obs, mode='human', close=False):
     elif mode == "egocentric_layout":
         print("555")
         return build_layout_egocentric(obs)
+
+
+
+def render55(obs, mode='human', close=False):
+    if mode == "egocentric":
+        print("111")
+        layout = build_layout_egocentric(obs)
+        return render_from_layout(layout, get_token_images)
+    elif mode == "human":
+
+        layout = build_layout(obs)
+        return render_from_layout(layout, get_token_images), layout
+    elif mode == "egocentric_crisp":
+        print("333")
+        layout = build_layout_egocentric(obs)
+        return render_from_layout_crisp(layout, get_token_images)
+    elif mode == "human_crisp":
+        print("444")
+        layout = build_layout(obs)
+        return render_from_layout_crisp(layout, get_token_images)
+    elif mode == "layout":
+        return build_layout(obs)
+    elif mode == "egocentric_layout":
+        print("555")
+        return build_layout_egocentric(obs)
